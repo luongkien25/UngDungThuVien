@@ -1,6 +1,6 @@
 package org.example;
 
-public abstract class Book implements LibraryItem {
+public class Book implements LibraryItem {
     private String title;
     private String authors;
     private String category;
