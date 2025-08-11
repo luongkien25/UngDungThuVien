@@ -50,4 +50,17 @@ public class Library {
         }
         return null;
     }
+    public void borrowBook(LibraryUser user, Book book) {
+        if (user != null && book != null && book.getQuantity() > 0) {
+            user.borrowBook(book);
+            book.setQuantity(book.getQuantity() - 1); // trừ số lượng
+        } else {
+            System.out.println("Không thể mượn sách: " + (book == null ? "book null" : "hết sách"));
+        }
+    }
+
+
+    public LibraryItem findItemById(String id) {
+        return null;
+    }
 }

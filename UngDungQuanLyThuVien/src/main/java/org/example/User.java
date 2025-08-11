@@ -1,42 +1,94 @@
 package org.example;
 
-import java.awt.print.Book;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 public class User implements LibraryUser {
     private String userId;
     private String name;
-    private List<BorrowRecord> borrowRecord = new ArrayList();
+    private List<BorrowRecord> borrowRecord = new ArrayList<>();
+
     public User(String userId, String name) {
         this.userId = userId;
         this.name = name;
     }
-    public String getUserId() {return this.userId;}
-    public void setUserId(String userId) {this.userId = userId;}
-    public String getName() {return this.name;}
-    public void setName(String name) {this.name = name;}
-    public List<BorrowRecord> getBorrowRecord() {return this.borrowRecord;}
 
-    public void borrowBook (Book book){
-    if (book.getQuantity() > 0){
-        this.borrowRecord.add(new BorrowRecord(book, new Date()));
-        book.setQuantity(book.getQuantity() - 1);
-    }
-
-    }
-    public void returnBook (Book book){
-        for (BorrowRecord br : this.borrowRecord){
-            if (br.getBook().equals(book)){
-                this.borrowRecord.remove(br);
-                book.setQuantity(book.getQuantity() + 1);
-                break;
-            }
-    }
-
+    @Override
+    public String getUserId() {
+        return userId;
     }
 
     @Override
-    public String toString() { return this.userId + " - " + this.name;}
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    @Override
+    public String getName() {
+        return name;
+    }
+
+    @Override
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public List<BorrowRecord> getBorrowRecord() {
+        return borrowRecord;
+    }
+
+    @Override
+    public List<LibraryItem> getBorrowedItems() {
+        List<LibraryItem> items = new ArrayList<>();
+        for (BorrowRecord record : borrowRecord) {
+            items.add(record.getItem());
+        }
+        return items;
+    }
+
+    @Override
+    public List<LibraryItem> getBorrowedBooks() {
+        List<LibraryItem> books = new ArrayList<>();
+        for (BorrowRecord record : borrowRecord) {
+            if (record.getItem() instanceof Book) {
+                books.add(record.getItem());
+            }
+        }
+        return books;
+    }
+
+    @Override
+    public void borrowItem(LibraryItem item) {
+        if (item instanceof Book) {
+            Book book = (Book) item;
+            if (book.getQuantity() > 0) {
+                borrowRecord.add(new BorrowRecord(item, new Date()));
+                book.setQuantity(book.getQuantity() - 1);
+            }
+        } else {
+            // Mượn tài liệu khác (nếu có)
+            borrowRecord.add(new BorrowRecord(item, new Date()));
+        }
+    }
+
+    @Override
+    public void returnItem(LibraryItem item) {
+        Iterator<BorrowRecord> iterator = borrowRecord.iterator();
+        while (iterator.hasNext()) {
+            BorrowRecord record = iterator.next();
+            if (record.getItem().equals(item)) {
+                iterator.remove();
+                if (item instanceof Book) {
+                    Book book = (Book) item;
+                    book.setQuantity(book.getQuantity() + 1);
+                }
+                break;
+            }
+        }
+    }
+
+    @Override
+    public String toString() {
+        return userId + " - " + name;
+    }
 }

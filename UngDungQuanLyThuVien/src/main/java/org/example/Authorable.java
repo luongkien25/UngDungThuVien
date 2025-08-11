@@ -4,4 +4,3 @@ public interface Authorable {
     String getAuthors();
     void setAuthors(String authors);
 }
-s
