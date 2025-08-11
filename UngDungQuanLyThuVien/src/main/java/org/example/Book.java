@@ -40,7 +40,7 @@ public class Book implements LibraryItem {
     public int getQuantity() {
         return quantity;
     }
-    
+
     public void setQuantity(int quantity) {
         this.quantity = quantity;
     }
