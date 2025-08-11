@@ -1,6 +1,5 @@
 package org.example;
 
-import java.awt.print.Book;
 import java.util.List;
 
 public interface LibraryUser {
@@ -9,7 +8,7 @@ public interface LibraryUser {
     String getName();
     void setName(String name);
     List<BorrowRecord> getBorrowRecord();
-    void borrowBook (Book var1);
-    void returnBook (Book var1);
+    void borrowBook(Book book);
+    void returnBook(Book book);
     String toString();
 }

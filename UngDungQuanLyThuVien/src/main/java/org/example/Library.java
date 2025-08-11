@@ -1,6 +1,7 @@
 package org.example;
 
 import java.util.*;
+import java.sql.*;
 
 public class Library {
     private static Library instance;
@@ -22,6 +23,15 @@ public class Library {
             instance = new Library();
         }
         return instance;
+    }
+
+    public void loadBooksFromDatabase() {
+        try (Connection conn = DatabaseManager.getConnection()) {
+            BookDAO dao = new BookDAO(conn); // ✅ truyền Connection
+            items = dao.getAllBooks();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     public void addItem(LibraryItem item) { items.add(item); }

@@ -3,13 +3,19 @@ package org.example;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.Calendar;
 import java.util.List;
 import java.time.LocalDate;
 import java.util.Date;
+import java.util.Locale;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
 public class LibraryGUI {
     private final Library library = Library.getInstance();
-
     public LibraryGUI() {
+        library.loadBooksFromDatabase();
         JFrame frame = new JFrame("Library System Menu");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(400, 600);
@@ -64,13 +70,32 @@ public class LibraryGUI {
 
     private void addDocument() {
         String title = JOptionPane.showInputDialog("Enter title:");
+        if(title == null) return;
         String authors = JOptionPane.showInputDialog("Enter authors:");
+        if(authors == null) return;
         String category = JOptionPane.showInputDialog("Enter category:");
+        if(category == null) return;
         String isbn = JOptionPane.showInputDialog("Enter ISBN:");
-        int quantity = Integer.parseInt(JOptionPane.showInputDialog("Enter quantity:"));
+        if(isbn == null) return;
+        String quantityStr = JOptionPane.showInputDialog("Enter quantity:");
+        if (quantityStr == null) return;
 
+        int quantity;
+        try {
+            quantity = Integer.parseInt(quantityStr);
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(null, "Invalid quantity.");
+            return;
+        }
         Book book = new Book(title, authors, category, isbn, quantity);
         library.addItem(book);
+        try {
+            Connection conn = DatabaseManager.getConnection(); //????
+            BookDAO bookDAO = new BookDAO(conn);
+            bookDAO.insertBook(book);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
         JOptionPane.showMessageDialog(null, "Document added.");
     }
 
@@ -79,6 +104,13 @@ public class LibraryGUI {
         var item = library.findItemByIsbn(isbn);
         if (item != null) {
             library.removeItem(item);
+            try {
+                Connection conn = DatabaseManager.getConnection(); //????
+                BookDAO bookDAO = new BookDAO(conn);
+                bookDAO.removeBook(isbn);
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
             JOptionPane.showMessageDialog(null, "Document removed.");
         } else {
             JOptionPane.showMessageDialog(null, "Document not found.");
@@ -269,6 +301,13 @@ public class LibraryGUI {
 
             // Nếu không trùng, thêm mới
             library.addItem(selected);
+            try {
+                Connection conn = DatabaseManager.getConnection(); //????
+                BookDAO bookDAO = new BookDAO(conn);
+                bookDAO.insertBook(selected);
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
             JOptionPane.showMessageDialog(null, "Book added to library.");
 
         } catch (Exception e) {
@@ -288,16 +327,22 @@ public class LibraryGUI {
             LibraryUser user = users.get(i);
             List<BorrowRecord> brs = user.getBorrowRecord();
 
-            System.out.println("DEBUG: User '" + user.getName() + "' has " + brs.size() + " borrow records");
-
             for (int j = 0; j < brs.size(); j++) {
                 BorrowRecord br = brs.get(j);
                 Book book = br.getBook();
-                Date d = br.getBorrowDate();
-
+                Date borrowDate = br.getBorrowDate();
+                Calendar calendar = Calendar.getInstance();
+                calendar.setTime(borrowDate);
+                calendar.add(Calendar.DAY_OF_MONTH,14);
+                Date returnDate =  calendar.getTime();
+                Date now = new Date();  // Thời gian hiện tại
                 builder.append("User: ").append(user.getName()).append("\n");
                 builder.append("Book: ").append(book.toString()).append("\n");
-                builder.append("Borrowed on: ").append(d.toString()).append("\n");
+                builder.append("Borrowed on: ").append(borrowDate.toString()).append("\n");
+                builder.append("Returned on: ").append(returnDate.toString()).append("\n");
+                if(returnDate.before(now)) {
+                    builder.append("Overdue").append("\n");
+                }
                 builder.append("-----------------------------\n");
             }
         }
