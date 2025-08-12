@@ -29,9 +29,6 @@ public class Book implements LibraryItem {
 
     @Override
     public String getDescription() { return authors + " - " + category; }
-    @Override
-    }
-
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getAuthors() {return authors;}
