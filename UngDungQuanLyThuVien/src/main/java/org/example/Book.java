@@ -21,19 +21,11 @@ public class Book implements LibraryItem {
 
     public String getThumbnailLink() { return thumbnailLink; }
     public void setThumbnailLink(String thumbnailLink) { this.thumbnailLink = thumbnailLink; }
-
-    @Override
-    public String getTitle() { return title; }
-    @Override
-    public void setTitle(String title) { this.title = title; }
-
-    @Override
     public String getDescription() { return authors + " - " + category; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getAuthors() {return authors;}
     public String getCategory() {return category;}
-    public String getDescription() { return authors + " - " + category; }
     public void setDescription(String description) {}
     public String getIsbn() { return isbn; }
     public void setIsbn(String isbn) { this.isbn = isbn; }

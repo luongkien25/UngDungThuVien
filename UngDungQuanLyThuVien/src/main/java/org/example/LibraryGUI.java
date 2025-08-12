@@ -313,6 +313,56 @@ public class LibraryGUI {
         }
     }
 
+    private void borrowDocument() {
+        // 1) Lấy user từ Session
+        LibraryUser user = Session.getCurrentUser();
+        if (user == null) {
+            JOptionPane.showMessageDialog(null, "No user logged in. Please login first.");
+            return;
+        }
+
+        // 2) Lọc sách còn hàng
+        List<Book> availableBooks = library.getItems().stream()
+                .filter(i -> i instanceof Book && i.getQuantity() > 0)
+                .map(i -> (Book) i)
+                .toList();
+
+        if (availableBooks.isEmpty()) {
+            JOptionPane.showMessageDialog(null, "No available books to borrow.");
+            return;
+        }
+
+        // 3) Tạo label -> Book để hiển thị và tra ngược chính xác
+        Map<String, Book> labelToBook = new LinkedHashMap<>();
+        for (Book b : availableBooks) {
+            String label = b.getTitle() + " — ISBN: " + b.getIsbn() + " — Qty: " + b.getQuantity();
+            labelToBook.put(label, b);
+        }
+
+        String[] options = labelToBook.keySet().toArray(new String[0]);
+        String selected = (String) JOptionPane.showInputDialog(
+                null, "Select book to borrow:", "Borrow Document",
+                JOptionPane.PLAIN_MESSAGE, null, options, options[0]
+        );
+        if (selected == null) return;
+
+        Book selectedBook = labelToBook.get(selected);
+        if (selectedBook == null) {
+            JOptionPane.showMessageDialog(null, "Book not found.");
+            return;
+        }
+
+        // 4) Ghi DB trước, rồi cập nhật bộ nhớ
+        try {
+            new UserDAO().borrowBook(user.getUserId(), selectedBook.getIsbn(), java.time.LocalDate.now()); // DB
+            user.borrowBook(selectedBook); // bộ nhớ (giảm quantity, lưu bản ghi mượn trong session)
+            JOptionPane.showMessageDialog(null,
+                    "Book borrowed.\nRemaining quantity: " + selectedBook.getQuantity());
+        } catch (java.sql.SQLException e) {
+            JOptionPane.showMessageDialog(null, "DB error: " + e.getMessage());
+        }
+    }
+
     private void returnDocument() {
         // 1) Kiểm tra đăng nhập
         LibraryUser lu = Session.getCurrentUser();
@@ -431,139 +481,6 @@ public class LibraryGUI {
         panel.add(buttonPanel, BorderLayout.SOUTH);
 
         JOptionPane.showMessageDialog(null, panel, "Borrowed Documents", JOptionPane.PLAIN_MESSAGE);
-    }
-
-
-    private void returnDocument() {
-        LibraryUser user = Session.getCurrentUser();
-        if (user == null) {
-            JOptionPane.showMessageDialog(null, "No user logged in. Please login first.");
-            return;
-        }
-
-        List<LibraryItem> borrowedItems = new ArrayList<>(user.getBorrowedBooks());
-        if (borrowedItems.isEmpty()) {
-            JOptionPane.showMessageDialog(null, "You have not borrowed any documents.");
-            return;
-        }
-
-        // 2) Build bảng UI
-        String[] columnNames = {"ID/ISBN", "Title", "Type", "Author(s)"};
-        Object[][] data = new Object[borrowedItems.size()][4];
-        for (int i = 0; i < borrowedItems.size(); i++) {
-            LibraryItem it = borrowedItems.get(i);
-            data[i][0] = tryGetIsbnOrId(it);
-            data[i][1] = it.getTitle();
-            data[i][2] = it.getClass().getSimpleName();
-            data[i][3] = it.getAuthors();
-        }
-
-        JTable table = new JTable(new javax.swing.table.DefaultTableModel(data, columnNames) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
-        });
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-
-        JButton returnOneButton = new JButton("Return Selected Document");
-        JButton returnAllButton = new JButton("Return All Documents");
-
-        // 3) Trả 1 tài liệu: DB trước, bộ nhớ & UI sau
-        returnOneButton.addActionListener(e -> {
-            int row = table.getSelectedRow();
-            if (row < 0) {
-                JOptionPane.showMessageDialog(null, "Please select a document to return.");
-                return;
-            }
-
-            LibraryItem item = borrowedItems.get(row);
-            String isbn = tryGetIsbn(item);
-            if (isbn == null) {
-                JOptionPane.showMessageDialog(null, "Only books with ISBN can be returned via DB.");
-                return;
-            }
-
-            try {
-                new UserDAO().returnBook(user.getId(), isbn);    // cập nhật DB
-                if (item instanceof Book b) user.returnBook(b);   // cập nhật bộ nhớ (nếu có API riêng)
-                else user.returnItem(item);                       // hoặc API chung
-                ((DefaultTableModel) table.getModel()).removeRow(row);
-                borrowedItems.remove(row);
-                JOptionPane.showMessageDialog(null, "Document returned successfully.");
-            } catch (SQLException ex) {
-                JOptionPane.showMessageDialog(null, "DB error: " + ex.getMessage());
-            }
-        });
-
-        // 4) Trả tất cả: lặp qua, cố gắng trả từng cuốn, tổng hợp lỗi
-        returnAllButton.addActionListener(e -> {
-            if (borrowedItems.isEmpty()) {
-                JOptionPane.showMessageDialog(null, "No borrowed documents.");
-                return;
-            }
-            int confirm = JOptionPane.showConfirmDialog(
-                    null,
-                    "Are you sure you want to return all borrowed documents?",
-                    "Confirm Return All",
-                    JOptionPane.YES_NO_OPTION
-            );
-            if (confirm != JOptionPane.YES_OPTION) return;
-
-            DefaultTableModel model = (DefaultTableModel) table.getModel();
-            List<String> failed = new ArrayList<>();
-
-            // Duyệt bản sao để không vướng khi remove
-            for (int i = 0; i < borrowedItems.size(); i++) {
-                LibraryItem item = borrowedItems.get(i);
-                String isbn = tryGetIsbn(item);
-                if (isbn == null) {
-                    failed.add(item.getTitle() + " (no ISBN)");
-                    continue;
-                }
-                try {
-                    new UserDAO().returnBook(user.getId(), isbn);  // DB
-                    if (item instanceof Book b) user.returnBook(b);
-                    else user.returnItem(item);                     // bộ nhớ
-
-                    // xóa hàng tương ứng trên bảng (hàng 0 vì luôn xóa đầu)
-                    model.removeRow(0);
-                } catch (SQLException ex) {
-                    failed.add(item.getTitle() + " (" + ex.getMessage() + ")");
-                }
-            }
-            borrowedItems.clear();
-
-            if (failed.isEmpty()) {
-                JOptionPane.showMessageDialog(null, "All documents returned successfully.");
-            } else {
-                JOptionPane.showMessageDialog(null,
-                        "Some items failed to return:\n- " + String.join("\n- ", failed));
-            }
-        });
-
-        JPanel buttonPanel = new JPanel(new FlowLayout());
-        buttonPanel.add(returnOneButton);
-        buttonPanel.add(returnAllButton);
-
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.add(new JScrollPane(table), BorderLayout.CENTER);
-        panel.add(buttonPanel, BorderLayout.SOUTH);
-
-        JOptionPane.showMessageDialog(null, panel, "Borrowed Documents", JOptionPane.PLAIN_MESSAGE);
-    }
-
-    /** Ưu tiên lấy ISBN nếu là Book, fallback sang getId để hiển thị bảng. */
-    private String tryGetIsbnOrId(LibraryItem item) {
-        String isbn = tryGetIsbn(item);
-        return (isbn != null) ? isbn : item.getId();
-    }
-
-    /** Lấy ISBN chỉ khi là Book, nếu không trả null để biết không thể gọi DAO. */
-    private String tryGetIsbn(LibraryItem item) {
-        if (item instanceof Book) {
-            try {
-                return ((Book) item).getIsbn();
-            } catch (Exception ignored) {}
-        }
-        return null;
     }
 
     private void displayUserInfo() {
