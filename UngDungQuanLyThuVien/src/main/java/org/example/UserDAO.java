@@ -24,7 +24,7 @@ public class UserDAO {
     public List<BorrowRecord> getBorrowRecords(String userId) throws SQLException {
         String sql = """
             SELECT br.id, br.borrow_date,
-                   b.isbn, b.title, b.authors, b.category, b.quantity
+                   b.isbn, b.title, b.authors, b.category, b.quantity, b.thumbnail_link
             FROM borrow_records br
             JOIN books b ON b.isbn = br.isbn
             WHERE br.user_id = ?

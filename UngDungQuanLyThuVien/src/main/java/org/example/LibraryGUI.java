@@ -21,13 +21,13 @@ public class LibraryGUI {
     private final Library library = Library.getInstance();
 
     public LibraryGUI() {
-        // Nạp dữ liệu từ DB vào bộ nhớ (DAO tự mở/đóng connection)
+
         library.loadBooksFromDatabase();
         library.loadUsersFromDatabase();
 
         JFrame frame = new JFrame("📚 Library Management System");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(500, 700);
+        frame.setSize(800, 800);
 
         // Font và màu mặc định
         Font font = new Font("Segoe UI Emoji", Font.PLAIN, 16);
@@ -208,8 +208,8 @@ public class LibraryGUI {
             }
 
             try {
-                new BookDAO().removeBook(isbn); // xóa DB
-                library.removeItem(item);       // xóa bộ nhớ
+                new BookDAO().removeBook(isbn);
+                library.removeItem(item);
                 JOptionPane.showMessageDialog(null, "Document removed.");
             } catch (SQLException e) {
                 JOptionPane.showMessageDialog(null, "This book is currently borrowed by another user.");
@@ -266,33 +266,74 @@ public class LibraryGUI {
 
     private void displayDocuments() {
         List<LibraryItem> items = library.getItems();
-        if (items.isEmpty()) {
+        if (items == null || items.isEmpty()) {
             JOptionPane.showMessageDialog(null, "No documents.");
             return;
         }
 
-        for (LibraryItem item : items) {
-            JPanel bookPanel = new JPanel(new BorderLayout(10, 10));
-            bookPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        // Panel danh sách (xếp dọc)
+        JPanel listPanel = new JPanel();
+        listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
+        listPanel.setBackground(Color.WHITE);
 
-            // Thông tin sách bên trái
-            JTextArea infoArea = new JTextArea(item.toString());
-            infoArea.setEditable(false);
-            infoArea.setLineWrap(true);
-            infoArea.setWrapStyleWord(true);
-            bookPanel.add(infoArea, BorderLayout.CENTER);
+        for (LibraryItem li : items) {
+            if (!(li instanceof Book b)) continue;
+
+            // BookPanel có nút Borrow
+            BookPanel bookPanel = new BookPanel(b, true);
+
+            // Card bọc BookPanel + QR bên phải
+            JPanel card = new JPanel(new BorderLayout(12, 12));
+            card.setBackground(Color.WHITE);
+            card.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(new Color(220, 220, 220)),
+                    BorderFactory.createEmptyBorder(10, 10, 10, 10)
+            ));
+
+            // BookPanel ở giữa (tự hiển thị ảnh + info + Borrow như bạn đã làm)
+            card.add(bookPanel, BorderLayout.CENTER);
 
             // QR code bên phải
             try {
-                BufferedImage qrImage = QRCodeGenerator.generateQRCodeImage(item.toString(), 120, 120);
-                JLabel qrLabel = new JLabel(new ImageIcon(qrImage));
-                bookPanel.add(qrLabel, BorderLayout.EAST);
+                // Nội dung QR: tùy bạn. Ví dụ: ưu tiên ID/ISBN, fallback toString()
+                String qrContent = (b.getId() != null && !b.getId().isBlank()) ? ("BOOK_ID:" + b.getId())
+                        : (b.getIsbn() != null && !b.getIsbn().isBlank() && !"N/A".equalsIgnoreCase(b.getIsbn())) ? ("ISBN:" + b.getIsbn())
+                        : b.toString();
+
+                BufferedImage qr = QRCodeGenerator.generateQRCodeImage(qrContent, 120, 120);
+                JLabel qrLabel = new JLabel(new ImageIcon(qr));
+                qrLabel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
+                card.add(qrLabel, BorderLayout.EAST);
             } catch (Exception e) {
                 System.err.println("Failed to generate QR code: " + e.getMessage());
             }
 
-            JOptionPane.showMessageDialog(null, bookPanel, "Document Info", JOptionPane.PLAIN_MESSAGE);
+            listPanel.add(card);
+            listPanel.add(Box.createVerticalStrut(10)); // khoảng cách giữa các card
         }
+
+        // ScrollPane + dialog (một trang duy nhất)
+        JScrollPane scrollPane = new JScrollPane(listPanel);
+        scrollPane.setPreferredSize(new Dimension(900, 650));
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+
+        JDialog dialog = new JDialog((Frame) null, "Library Books", true);
+        dialog.getContentPane().add(scrollPane);
+        dialog.pack();
+        dialog.setLocationRelativeTo(null);
+
+        // đảm bảo cuộn về đầu khi mở
+        dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowOpened(java.awt.event.WindowEvent e) {
+                SwingUtilities.invokeLater(() -> {
+                    scrollPane.getViewport().setViewPosition(new Point(0, 0));
+                    scrollPane.getVerticalScrollBar().setValue(0);
+                });
+            }
+        });
+
+        dialog.setVisible(true);
     }
 
     private void addUser() {
@@ -508,12 +549,17 @@ public class LibraryGUI {
             // Panel chứa danh sách BookPanel
             JPanel resultPanel = new JPanel();
             resultPanel.setLayout(new BoxLayout(resultPanel, BoxLayout.Y_AXIS));
+            resultPanel.setAutoscrolls(false);
+
+            Library library = Library.getInstance();
+            BookDAO dao = new BookDAO();
 
             for (Book book : results) {
-                BookPanel panel = new BookPanel(book);
+                BookPanel panel = new BookPanel(book, false); // ẩn Borrow
 
-                // Bắt sự kiện click Add (thêm sách vào thư viện)
+                // Nút Add
                 JButton addButton = new JButton("Add");
+                addButton.setFocusable(false); // tránh auto-scroll do focus
                 addButton.addActionListener(e -> {
                     String quantityStr = JOptionPane.showInputDialog("Enter quantity to add:", "1");
                     if (quantityStr == null || quantityStr.trim().isEmpty()) return;
@@ -527,50 +573,76 @@ public class LibraryGUI {
                         return;
                     }
 
+                    // set số lượng muốn cộng/thêm
                     book.setQuantity(quantity);
 
-                    // Kiểm tra ISBN
-                    if (!book.getIsbn().equals("N/A")) {
-                        LibraryItem existing = library.findItemByIsbn(book.getIsbn());
-                        if (existing instanceof Book existingBook) {
-                            existingBook.setQuantity(existingBook.getQuantity() + quantity);
-                            JOptionPane.showMessageDialog(null, "Book already exists. Increased quantity to " + existingBook.getQuantity() + ".");
-                            return;
-                        }
-                    }
+                    try {
+                        // UPSERT trong DB: trùng -> DB tự cộng; không trùng -> insert
+                        dao.insertBook(book); // sẽ set id + quantity hiện tại trong DB cho book
 
-                    // Kiểm tra trùng theo title + description
-                    for (LibraryItem item : library.getItems()) {
-                        if (item instanceof Book b &&
-                                b.getIsbn().equals("N/A") &&
-                                b.getTitle().equalsIgnoreCase(book.getTitle()) &&
-                                b.getDescription().equalsIgnoreCase(book.getDescription())) {
-                            b.setQuantity(b.getQuantity() + quantity);
-                            JOptionPane.showMessageDialog(null, "Book matched by title + author. Quantity updated to " + b.getQuantity() + ".");
-                            return;
+                        // tìm theo ISBN (nếu có), không có thì theo id
+                        Book matched = null;
+                        if (book.getIsbn() != null && !"N/A".equalsIgnoreCase(book.getIsbn()) && !book.getIsbn().isBlank()) {
+                            LibraryItem li = library.findItemByIsbn(book.getIsbn());
+                            if (li instanceof Book) matched = (Book) li;
                         }
-                    }
+                        if (matched == null && book.getId() != null) {
+                            for (LibraryItem li : library.getItems()) {
+                                if (li instanceof Book b && book.getId().equals(b.getId())) {
+                                    matched = b; break;
+                                }
+                            }
+                        }
 
-                    // Thêm mới nếu không trùng
-                    library.addItem(book);
-                    JOptionPane.showMessageDialog(null, "Book added to library.");
+                        if (matched != null) {
+                            // đã có trong RAM -> đặt quantity theo DB (đã +)
+                            matched.setQuantity(book.getQuantity());
+                            JOptionPane.showMessageDialog(null,
+                                    "Quantity increased in database. New quantity: " + matched.getQuantity());
+                        } else {
+                            // chưa có trong RAM -> thêm vào RAM (book đang mang id + quantity từ DB)
+                            library.addItem(book);
+                            JOptionPane.showMessageDialog(null,
+                                    "Book added to library. (ID: " + book.getId() + ", Qty: " + book.getQuantity() + ")");
+                        }
+                    } catch (SQLException ex) {
+                        JOptionPane.showMessageDialog(null, "DB error: " + ex.getMessage());
+                    }
                 });
 
-                // Thêm nút vào panel
                 panel.add(addButton, BorderLayout.SOUTH);
                 resultPanel.add(panel);
-                resultPanel.add(Box.createVerticalStrut(10)); // khoảng cách giữa các book
+                resultPanel.add(Box.createVerticalStrut(10)); // khoảng cách
             }
 
+            // ScrollPane + Dialog (để kiểm soát scrollbar ở đầu)
             JScrollPane scrollPane = new JScrollPane(resultPanel);
             scrollPane.setPreferredSize(new Dimension(600, 600));
-            JOptionPane.showMessageDialog(null, scrollPane, "Search Results", JOptionPane.PLAIN_MESSAGE);
+
+            JDialog dialog = new JDialog((Frame) null, "Search Results", true);
+            dialog.getContentPane().add(scrollPane);
+            dialog.pack();
+            dialog.setLocationRelativeTo(null);
+
+            // Kéo scrollbar về đầu ngay khi dialog mở
+            dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override
+                public void windowOpened(java.awt.event.WindowEvent e) {
+                    SwingUtilities.invokeLater(() -> {
+                        scrollPane.getViewport().setViewPosition(new Point(0, 0));
+                        scrollPane.getVerticalScrollBar().setValue(0);
+                    });
+                }
+            });
+
+            dialog.setVisible(true);
 
         } catch (Exception e) {
             JOptionPane.showMessageDialog(null, "Error: " + e.getMessage());
             e.printStackTrace();
         }
     }
+
 
     private void displayBorrowRecords() {
         List<LibraryUser> users = library.getUsers();
@@ -618,7 +690,7 @@ public class LibraryGUI {
 
         JScrollPane scrollPane = new JScrollPane(textArea);
         scrollPane.setPreferredSize(new Dimension(600, 400)); // Kích thước tùy chỉnh
-
+        scrollPane.getVerticalScrollBar().setValue(0);
         JOptionPane.showMessageDialog(null, scrollPane, "Borrow Records", JOptionPane.INFORMATION_MESSAGE);
     }
 

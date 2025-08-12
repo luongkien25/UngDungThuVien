@@ -3,6 +3,8 @@ package org.example;
 import java.util.List;
 
 public interface LibraryUser {
+    /**private String userID;
+    private String password;*/
     String getUserId();
     void setUserId(String userId);
 

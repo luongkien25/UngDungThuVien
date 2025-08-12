@@ -10,8 +10,13 @@ import org.example.Library;
 
 public class BookPanel extends JPanel {
     private final Book book;
+    private JButton borrowButton; // giữ tham chiếu để ẩn/hiện dễ dàng
 
     public BookPanel(Book book) {
+        this(book, true); // mặc định vẫn hiển thị nút Borrow
+    }
+
+    public BookPanel(Book book, boolean showBorrow) {
         this.book = book;
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createLineBorder(Color.GRAY, 1));
@@ -22,7 +27,7 @@ public class BookPanel extends JPanel {
         imageLabel.setPreferredSize(new Dimension(100, 150));
 
         String imageUrl = book.getThumbnailLink();
-        if (imageUrl != null && !imageUrl.isEmpty() && !imageUrl.equals("N/A")) {
+        if (imageUrl != null && !imageUrl.isEmpty() && !"N/A".equals(imageUrl)) {
             try {
                 Image image = ImageIO.read(new URL(imageUrl));
                 Image scaledImage = image.getScaledInstance(100, 150, Image.SCALE_SMOOTH);
@@ -44,8 +49,8 @@ public class BookPanel extends JPanel {
         infoArea.setBorder(null);
         infoArea.setFont(new Font("Segoe UI", Font.PLAIN, 14));
 
-        // === Nút "Borrow" ===
-        JButton borrowButton = new JButton("Borrow");
+        // === Nút Borrow (có thể ẩn) ===
+        borrowButton = new JButton("Borrow");
         borrowButton.addActionListener(e -> {
             Book borrowedBook = new Book(
                     book.getTitle(),
@@ -66,13 +71,20 @@ public class BookPanel extends JPanel {
             }
         });
 
-        // === Tổ chức layout ===
         JPanel centerPanel = new JPanel(new BorderLayout());
         centerPanel.setBackground(Color.WHITE);
         centerPanel.add(infoArea, BorderLayout.CENTER);
-        centerPanel.add(borrowButton, BorderLayout.SOUTH);
+
+        if (showBorrow) {
+            centerPanel.add(borrowButton, BorderLayout.SOUTH);
+        }
 
         add(imageLabel, BorderLayout.WEST);
         add(centerPanel, BorderLayout.CENTER);
+    }
+
+    // tiện nếu muốn điều khiển bằng code
+    public void setBorrowVisible(boolean visible) {
+        if (borrowButton != null) borrowButton.setVisible(visible);
     }
 }
