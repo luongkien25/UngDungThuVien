@@ -25,6 +25,7 @@ public class Book implements LibraryItem {
     public void setIsbn(String isbn) { this.isbn = isbn; }
     public int getQuantity() { return quantity; }
     public void setQuantity(int quantity) { this.quantity = quantity; }
+    public void setCategory(String category) { this.category = category; }
     public String toString() {
         return title + " by " + authors + " (" + category + ") - ISBN: " + isbn + " | Quantity: " + quantity;
     }

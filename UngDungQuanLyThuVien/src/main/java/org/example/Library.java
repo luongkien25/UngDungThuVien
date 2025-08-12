@@ -26,9 +26,27 @@ public class Library {
     }
 
     public void loadBooksFromDatabase() {
-        try (Connection conn = DatabaseManager.getConnection()) {
-            BookDAO dao = new BookDAO(conn); // ✅ truyền Connection
-            items = dao.getAllBooks();
+        try {
+            BookDAO dao = new BookDAO();
+            var list = dao.getAllBooks();
+            items.clear();
+            items.addAll(list);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void loadUsersFromDatabase() {
+        try {
+            UserDAO udao = new UserDAO();
+            users.clear();
+            users.addAll(udao.getAllUsers());
+            for (LibraryUser lu : users) {
+                if (lu instanceof User u) {
+                    u.getBorrowRecord().clear();
+                    u.getBorrowRecord().addAll(udao.getBorrowRecords(u.getUserId()));
+                }
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
