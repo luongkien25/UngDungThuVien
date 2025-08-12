@@ -41,7 +41,8 @@ public class UserDAO {
                             rs.getString("authors"),
                             rs.getString("category"),
                             rs.getString("isbn"),
-                            rs.getInt("quantity")
+                            rs.getInt("quantity"),
+                            rs.getString("thumbnail_link")
                     );
                     java.sql.Date d = rs.getDate("borrow_date");
                     list.add(new BorrowRecord(book, new java.util.Date(d.getTime())));

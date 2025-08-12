@@ -6,7 +6,7 @@ import java.util.ArrayList;
 public class BookDAO {
 
     public ArrayList<LibraryItem> getAllBooks() throws SQLException {
-        String sql = "SELECT isbn, title, authors, category, quantity FROM books";
+        String sql = "SELECT isbn, title, authors, category, quantity, thumbnail_link FROM books";
         ArrayList<LibraryItem> books = new ArrayList<>();
 
         try (Connection conn = DatabaseManager.getConnection();
@@ -19,7 +19,8 @@ public class BookDAO {
                         rs.getString("authors"),
                         rs.getString("category"),
                         rs.getString("isbn"),
-                        rs.getInt("quantity")
+                        rs.getInt("quantity"),
+                        rs.getString("thumbnail_link")
                 );
                 books.add(b);
             }
