@@ -53,6 +53,7 @@ public class LibraryGUI {
         panel.add(Box.createRigidArea(new Dimension(0, 20)));
 
 
+        String[] buttonLabels = {
                 "🔐 Login",
                 "🔓 Logout",
                 "➕📄 Add Document",
@@ -67,6 +68,7 @@ public class LibraryGUI {
                 "🔍📘 Search Google Books",
                 "📝 Display Borrow Records",
                 "🚪 Exit"
+        };
 
         for (int i = 0; i < buttonLabels.length; i++) {
             JButton button = new JButton("[" + i + "] " + buttonLabels[i]);
@@ -310,11 +312,6 @@ public class LibraryGUI {
             JOptionPane.showMessageDialog(null, "DB error: " + e.getMessage());
         }
     }
-
-import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
-import java.awt.*;
-import java.util.List;
 
     private void returnDocument() {
         // 1) Kiểm tra đăng nhập
