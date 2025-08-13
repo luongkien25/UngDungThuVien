@@ -312,10 +312,16 @@ public class LibraryGUI {
         dialog.pack();
         dialog.setLocationRelativeTo(null);
 
+        // Khai báo trước để truyền vào BookPanel (callback refresh)
+        final Runnable[] doSearchRef = new Runnable[1];
+
         // Render lần đầu: hiển thị tất cả
-        renderBooks(listPanel, allBooks);
-        listPanel.revalidate();
-        listPanel.repaint();
+        renderBooks(listPanel, allBooks,
+                () -> { if (doSearchRef[0] != null) doSearchRef[0].run(); },
+                true,  // showBorrow
+                true,  // showUpdate
+                true   // showRemove
+        );
         SwingUtilities.invokeLater(() -> {
             scrollPane.getViewport().setViewPosition(new Point(0, 0));
             scrollPane.getVerticalScrollBar().setValue(0);
@@ -327,12 +333,18 @@ public class LibraryGUI {
             List<Book> toShow = q.isEmpty()
                     ? allBooks
                     : Optional.ofNullable(library.search(q)).orElse(Collections.emptyList());
-            renderBooks(listPanel, toShow);
+            renderBooks(listPanel, toShow,
+                    () -> { if (doSearchRef[0] != null) doSearchRef[0].run(); },
+                    true,  // showBorrow
+                    true,  // showUpdate
+                    true   // showRemove
+            );
             SwingUtilities.invokeLater(() -> {
                 scrollPane.getViewport().setViewPosition(new Point(0, 0));
                 scrollPane.getVerticalScrollBar().setValue(0);
             });
         };
+        doSearchRef[0] = doSearch;
 
         // Bấm nút Search
         searchBtn.addActionListener(ev -> doSearch.run());
@@ -354,7 +366,10 @@ public class LibraryGUI {
         // Nút Clear: xoá và hiển thị lại tất cả
         clearBtn.addActionListener(ev -> {
             if (!searchField.getText().isEmpty()) searchField.setText("");
-            renderBooks(listPanel, allBooks);
+            renderBooks(listPanel, allBooks,
+                    () -> { if (doSearchRef[0] != null) doSearchRef[0].run(); },
+                    true, true, true
+            );
             SwingUtilities.invokeLater(() -> {
                 scrollPane.getViewport().setViewPosition(new Point(0, 0));
                 scrollPane.getVerticalScrollBar().setValue(0);
@@ -369,6 +384,56 @@ public class LibraryGUI {
         });
 
         dialog.setVisible(true);
+    }
+
+
+    // === renderBooks: truyền cờ hiển thị nút & callback refresh ===
+    private void renderBooks(JPanel listPanel, List<Book> books,
+                             Runnable onRefresh,
+                             boolean showBorrow, boolean showUpdate, boolean showRemove) {
+        listPanel.removeAll();
+
+        if (books == null || books.isEmpty()) {
+            JLabel empty = new JLabel("No results.");
+            empty.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+            listPanel.add(empty);
+            listPanel.revalidate();
+            listPanel.repaint();
+            return;
+        }
+
+        for (Book b : books) {
+            // BookPanel có nút Borrow/Update/Remove tùy chọn
+            BookPanel bookPanel = new BookPanel(b, showBorrow, showUpdate, showRemove, onRefresh);
+
+            JPanel card = new JPanel(new BorderLayout(12, 12));
+            card.setBackground(Color.WHITE);
+            card.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(new Color(220, 220, 220)),
+                    BorderFactory.createEmptyBorder(10, 10, 10, 10)
+            ));
+            card.add(bookPanel, BorderLayout.CENTER);
+
+            // QR code bên phải
+            try {
+                String qrContent = (b.getId() != null && !b.getId().isBlank()) ? ("BOOK_ID:" + b.getId())
+                        : (b.getIsbn() != null && !b.getIsbn().isBlank() && !"N/A".equalsIgnoreCase(b.getIsbn())) ? ("ISBN:" + b.getIsbn())
+                        : b.toString();
+
+                BufferedImage qr = QRCodeGenerator.generateQRCodeImage(qrContent, 120, 120);
+                JLabel qrLabel = new JLabel(new ImageIcon(qr));
+                qrLabel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
+                card.add(qrLabel, BorderLayout.EAST);
+            } catch (Exception ex) {
+                System.err.println("Failed to generate QR code: " + ex.getMessage());
+            }
+
+            listPanel.add(card);
+            listPanel.add(Box.createVerticalStrut(10));
+        }
+
+        listPanel.revalidate();
+        listPanel.repaint();
     }
 
 
