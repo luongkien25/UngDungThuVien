@@ -13,7 +13,7 @@ public class GoogleBooksAPI {
         HttpURLConnection conn = (HttpURLConnection) new URL(apiUrl).openConnection();
         conn.setRequestMethod("GET");
 
-        BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+        BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8));
         StringBuilder response = new StringBuilder();
         String line;
         while ((line = in.readLine()) != null) response.append(line);
@@ -38,9 +38,19 @@ public class GoogleBooksAPI {
                         }
                     }
                 }
-                books.add(new Book(title, authors, category, isbn, 1));
+
+                String thumbnail = "";
+                if (volumeInfo.has("imageLinks")) {
+                    JSONObject imageLinks = volumeInfo.getJSONObject("imageLinks");
+                    thumbnail = imageLinks.optString("thumbnail", "");
+                }
+
+                //Đưa ảnh thumbnail trực tiếp vào constructor
+                Book book = new Book(title, authors, category, isbn, 1, thumbnail);
+                books.add(book);
             }
         }
+
         return books;
     }
 }
