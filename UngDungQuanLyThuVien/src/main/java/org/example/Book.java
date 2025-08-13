@@ -41,8 +41,16 @@ public class Book implements LibraryItem {
     public int getQuantity() { return quantity; }
     public void setQuantity(int quantity) { this.quantity = quantity; }
     public void setCategory(String category) { this.category = category; }
-    @Override public String toString() {
-        return title + " by " + authors + " (" + category + ") - ISBN: " + isbn + " | Quantity: " + quantity;
+    @Override
+    public String toString() {
+        String title = getTitle() != null ? getTitle() : "(No title)";
+        String authors = getAuthors() != null ? getAuthors() : "(Unknown)";
+        String isbnTxt = (getIsbn() == null || getIsbn().isBlank() || "N/A".equalsIgnoreCase(getIsbn()))
+                ? "N/A" : getIsbn();
+        String cat = (this.getCategory() != null) ? this.getCategory() : "";
+        return title + " by " + authors +
+                (cat.isBlank() ? "" : " (" + cat + ")") +
+                " - ISBN: " + isbnTxt + " | Quantity: " + getQuantity();
     }
     @Override public String getId() { return id; }
     @Override public void setId(String id) { this.id = id; }
@@ -72,7 +80,10 @@ public class Book implements LibraryItem {
     public String getNormIsbn() { return normIsbn; }
     public void setNormIsbn(String normIsbn) { this.normIsbn = normIsbn; }
 
-    public java.util.List<String> getTitleTokens() { return titleTokens; }
+    public java.util.List<String> getTitleTokens() {
+        if (this.titleTokens == null) this.titleTokens = new java.util.ArrayList<>();
+        return this.titleTokens;
+    }
     public void setTitleTokens(java.util.List<String> titleTokens) { this.titleTokens = titleTokens; }
 
     public java.util.List<String> getAuthorTokens() { return authorTokens; }

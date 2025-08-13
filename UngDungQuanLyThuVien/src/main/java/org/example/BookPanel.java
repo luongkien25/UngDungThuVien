@@ -14,14 +14,13 @@ public class BookPanel extends JPanel {
     private JButton removeButton;
 
     public BookPanel(Book book) {
-        this(book, true); // giữ tương thích cũ
+        this(book, true);
     }
 
     public BookPanel(Book book, boolean showBorrow) {
         this(book, showBorrow, false, false, null);
     }
 
-    // Constructor đầy đủ: chọn hiển thị Borrow/Update/Remove + callback refresh
     public BookPanel(Book book, boolean showBorrow, boolean showUpdate, boolean showRemove, Runnable onRefresh) {
         this.book = book;
         this.onRefresh = onRefresh;
@@ -35,7 +34,7 @@ public class BookPanel extends JPanel {
         imageLabel.setPreferredSize(new Dimension(100, 150));
 
         String imageUrl = book.getThumbnailLink();
-        if (imageUrl != null && !imageUrl.isEmpty() && !"N/A".equals(imageUrl)) {
+        if (imageUrl != null && !imageUrl.isEmpty() && !"N/A".equalsIgnoreCase(imageUrl)) {
             try {
                 Image image = ImageIO.read(new URL(imageUrl));
                 Image scaledImage = image.getScaledInstance(100, 150, Image.SCALE_SMOOTH);
@@ -48,8 +47,17 @@ public class BookPanel extends JPanel {
             imageLabel.setText("No Image");
         }
 
-        // === Thông tin sách ===
-        JTextArea infoArea = new JTextArea(book.toString());
+        // === Thông tin sách (build an toàn, không dùng toString()) ===
+        String title = book.getTitle() != null ? book.getTitle() : "(No title)";
+        String authors = book.getAuthors() != null ? book.getAuthors() : "(Unknown)";
+        String cat = book.getCategory() != null ? book.getCategory() : "";
+        String isbnTxt = (book.getIsbn() == null || book.getIsbn().isBlank() || "N/A".equalsIgnoreCase(book.getIsbn()))
+                ? "N/A" : book.getIsbn();
+        String info = title + " by " + authors +
+                (cat.isBlank() ? "" : " (" + cat + ")") +
+                " - ISBN: " + isbnTxt + " | Quantity: " + book.getQuantity();
+
+        JTextArea infoArea = new JTextArea(info);
         infoArea.setEditable(false);
         infoArea.setLineWrap(true);
         infoArea.setWrapStyleWord(true);
@@ -61,18 +69,26 @@ public class BookPanel extends JPanel {
         JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         actionPanel.setOpaque(false);
 
-        // Borrow
+        // Borrow (User dùng; Admin truyền showBorrow=false)
         if (showBorrow) {
             borrowButton = new JButton("Borrow");
             borrowButton.addActionListener(e -> {
                 LibraryUser currentUser = Session.getCurrentUser();
                 if (currentUser instanceof User u) {
                     try {
-                        u.borrowBook(book, new UserDAO()); // DB trước, RAM sau
+                        UserDAO dao = new UserDAO();
+                        int active = dao.countActiveBorrowing(u.getUserId());
+                        if (active >= 3) {
+                            JOptionPane.showMessageDialog(this, "Bạn đã mượn đủ 3 cuốn, hãy trả bớt trước khi mượn tiếp.");
+                            return;
+                        }
+                        u.borrowBook(book, dao);
                         JOptionPane.showMessageDialog(this, "You borrowed: " + book.getTitle());
                         refreshIfNeeded();
                     } catch (RuntimeException ex) {
                         JOptionPane.showMessageDialog(this, "Borrow failed: " + ex.getMessage());
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
                     }
                 } else {
                     JOptionPane.showMessageDialog(this, "No user logged in");
@@ -81,7 +97,7 @@ public class BookPanel extends JPanel {
             actionPanel.add(borrowButton);
         }
 
-        // Update
+        // Update (ƯU TIÊN THEO ID, fallback ISBN)
         if (showUpdate) {
             updateButton = new JButton("Update");
             updateButton.addActionListener(e -> {
@@ -106,12 +122,28 @@ public class BookPanel extends JPanel {
                 }
 
                 try {
-                    new BookDAO().updateBook(book.getIsbn(), newTitle, newAuthors, newCategory, newQty);
+                    BookDAO dao = new BookDAO();
+                    boolean done = false;
+
+                    String idStr = book.getId();
+                    if (idStr != null && !idStr.isBlank()) {
+                        dao.updateBookById(Integer.parseInt(idStr), newTitle, newAuthors, newCategory, newQty);
+                        done = true;
+                    } else {
+                        String isbn = book.getIsbn();
+                        if (isbn != null && !isbn.isBlank() && !"N/A".equalsIgnoreCase(isbn)) {
+                            dao.updateBook(isbn, newTitle, newAuthors, newCategory, newQty);
+                            done = true;
+                        }
+                    }
+                    if (!done) throw new IllegalStateException("No id or isbn to update.");
+
                     // cập nhật object trong RAM
                     book.setTitle(newTitle);
                     book.setDescription(newAuthors);
                     book.setQuantity(newQty);
                     book.setCategory(newCategory);
+
                     JOptionPane.showMessageDialog(this, "Document updated.");
                     refreshIfNeeded();
                 } catch (Exception ex) {
@@ -121,22 +153,36 @@ public class BookPanel extends JPanel {
             actionPanel.add(updateButton);
         }
 
-        // Remove
+        // Remove (ƯU TIÊN THEO ID, fallback ISBN)
         if (showRemove) {
             removeButton = new JButton("Remove");
             removeButton.addActionListener(e -> {
                 int ok = JOptionPane.showConfirmDialog(this,
-                        "Remove this document?\n" + book.getTitle(),
+                        "Remove this document?\n" + (book.getTitle() != null ? book.getTitle() : "(No title)"),
                         "Confirm", JOptionPane.YES_NO_OPTION);
                 if (ok != JOptionPane.YES_OPTION) return;
 
                 try {
-                    new BookDAO().removeBook(book.getIsbn());        // xóa DB
-                    Library.getInstance().removeItem(book);          // xóa RAM
+                    BookDAO dao = new BookDAO();
+                    boolean done = false;
+
+                    String idStr = book.getId();
+                    if (idStr != null && !idStr.isBlank()) {
+                        dao.removeBookById(Integer.parseInt(idStr));
+                        done = true;
+                    } else {
+                        String isbn = book.getIsbn();
+                        if (isbn != null && !isbn.isBlank() && !"N/A".equalsIgnoreCase(isbn)) {
+                            dao.removeBook(isbn);
+                            done = true;
+                        }
+                    }
+                    if (!done) throw new IllegalStateException("No id or isbn to remove.");
+
+                    Library.getInstance().removeItem(book); // xóa RAM
                     JOptionPane.showMessageDialog(this, "Document removed.");
                     refreshIfNeeded();
                 } catch (java.sql.SQLException exSql) {
-                    // case: đang có người mượn
                     JOptionPane.showMessageDialog(this, "This book is currently borrowed by another user.");
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
@@ -161,7 +207,6 @@ public class BookPanel extends JPanel {
         }
     }
 
-    // tiện nếu muốn điều khiển bằng code
     public void setBorrowVisible(boolean visible) {
         if (borrowButton != null) borrowButton.setVisible(visible);
     }

@@ -166,4 +166,102 @@ public class UserDAO {
             }
         }
     }
+
+    public boolean changePassword(String userId, String oldPlain, String newPlain) throws SQLException {
+        String sel = "SELECT password_hash FROM users WHERE user_id = ?";
+        String upd = "UPDATE users SET password_hash = ? WHERE user_id = ?";
+        try (Connection c = DatabaseManager.getConnection();
+             PreparedStatement ps = c.prepareStatement(sel)) {
+            ps.setString(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return false;
+                String current = rs.getString(1);
+                if (!PasswordUtil.matches(oldPlain, current)) return false;
+            }
+            try (PreparedStatement up = c.prepareStatement(upd)) {
+                up.setString(1, PasswordUtil.hash(newPlain));
+                up.setString(2, userId);
+                return up.executeUpdate() == 1;
+            }
+        }
+    }
+
+    public boolean adminSetPassword(String userId, String newPlain) throws SQLException {
+        String upd = "UPDATE users SET password_hash = ? WHERE user_id = ?";
+        try (Connection c = DatabaseManager.getConnection();
+             PreparedStatement up = c.prepareStatement(upd)) {
+            up.setString(1, PasswordUtil.hash(newPlain));
+            up.setString(2, userId);
+            return up.executeUpdate() == 1;
+        }
+    }
+
+    public int countActiveBorrowing(String userId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM borrow_records WHERE user_id = ? AND return_date IS NULL";
+        try (Connection c = DatabaseManager.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, userId);
+            try (ResultSet rs = ps.executeQuery()) { rs.next(); return rs.getInt(1); }
+        }
+    }
+
+    public java.util.List<java.util.Map<String,Object>> getRecentlyRead(String userId, int limit) throws SQLException {
+        String sql = """
+        SELECT b.id, b.title, b.authors, b.category, br.return_date
+        FROM borrow_records br
+        JOIN books b ON b.id = br.book_id
+        WHERE br.user_id = ? AND br.return_date IS NOT NULL
+        ORDER BY br.return_date DESC
+        LIMIT ?
+    """;
+        try (Connection c = DatabaseManager.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, userId);
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                java.util.List<java.util.Map<String,Object>> out = new java.util.ArrayList<>();
+                while (rs.next()) {
+                    java.util.Map<String,Object> m = new java.util.LinkedHashMap<>();
+                    m.put("id", rs.getInt("id"));
+                    m.put("title", rs.getString("title"));
+                    m.put("authors", rs.getString("authors"));
+                    m.put("category", rs.getString("category"));
+                    m.put("return_date", rs.getTimestamp("return_date"));
+                    out.add(m);
+                }
+                return out;
+            }
+        }
+    }
+    public java.util.List<Book> getRecentlyReadBooks(String userId, int limit) throws SQLException {
+        String sql = """
+        SELECT b.id, b.isbn, b.title, b.authors, b.category, b.quantity, b.thumbnail_link
+        FROM borrow_records br
+        JOIN books b ON b.id = br.book_id
+        WHERE br.user_id = ? AND br.return_date IS NOT NULL
+        ORDER BY br.return_date DESC
+        LIMIT ?
+    """;
+        try (Connection c = DatabaseManager.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, userId);
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                java.util.List<Book> out = new java.util.ArrayList<>();
+                while (rs.next()) {
+                    Book b = new Book(
+                            rs.getString("title"),
+                            rs.getString("authors"),
+                            rs.getString("category"),
+                            rs.getString("isbn"),
+                            rs.getInt("quantity"),
+                            rs.getString("thumbnail_link")
+                    );
+                    b.setId(String.valueOf(rs.getInt("id")));
+                    out.add(b);
+                }
+                return out;
+            }
+        }
+    }
 }
