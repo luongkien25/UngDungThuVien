@@ -7,6 +7,70 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class UserDAO {
+    /**
+     * Xác thực người dùng.
+     * @param userId ID người dùng
+     * @param plainPassword Mật khẩu dạng văn bản thuần
+     * @return Đối tượng User nếu thành công, null nếu thất bại.
+     */
+    public User authenticateUser(String userId, String plainPassword) throws SQLException {
+        String sql = "SELECT user_id, name, password FROM users WHERE user_id = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    String hashedPassword = rs.getString("password");
+                    if (PasswordUtils.checkPassword(plainPassword, hashedPassword)) {
+                        return new User(rs.getString("user_id"), rs.getString("name"), hashedPassword);
+                    }
+                }
+            }
+        }
+        return null; // Xác thực thất bại
+    }
+
+    /**
+     * Thay đổi mật khẩu cho người dùng đã đăng nhập.
+     * @param userId ID người dùng
+     * @param newPassword Mật khẩu mới
+     */
+    public void changePassword(String userId, String newPassword) throws SQLException {
+        String newHashedPassword = PasswordUtils.hashPassword(newPassword);
+        String sql = "UPDATE users SET password = ? WHERE user_id = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, newHashedPassword);
+            ps.setString(2, userId);
+            ps.executeUpdate();
+        }
+    }
+
+    /**
+     * Reset mật khẩu (dành cho chức năng "Quên mật khẩu").
+     * @param userId ID người dùng
+     * @param newPassword Mật khẩu mới
+     */
+    public void resetPassword(String userId, String newPassword) throws SQLException {
+        // Trong một ứng dụng thực tế, bạn nên xác minh danh tính người dùng
+        // trước khi cho phép reset, ví dụ qua email.
+        // Ở đây, chúng ta thực hiện trực tiếp để đơn giản hóa.
+        changePassword(userId, newPassword);
+    }
+
+
+    public void insertUser(User u, String plainPassword) throws SQLException {
+        String hashedPassword = PasswordUtils.hashPassword(plainPassword);
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO users(user_id, name, password) VALUES(?, ?, ?)")) {
+            ps.setString(1, u.getUserId());
+            ps.setString(2, u.getName());
+            ps.setString(3, hashedPassword); // Lưu mật khẩu đã băm
+            ps.executeUpdate();
+        }
+    }
 
     public List<User> getAllUsers() throws SQLException {
         String sql = "SELECT user_id, name FROM users";

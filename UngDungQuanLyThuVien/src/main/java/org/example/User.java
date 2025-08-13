@@ -5,15 +5,23 @@ import java.util.*;
 public class User implements LibraryUser {
     private String userId;
     private String name;
+    private String password;
     private final List<BorrowRecord> borrowRecord = new ArrayList<>();
 
     public User(String userId, String name) { this.userId = userId; this.name = name; }
+    public User(String userId, String name, String password) {
+        this.userId = userId;
+        this.name = name;
+        this.password = password;
+    }
 
     @Override public String getUserId() { return userId; }
     @Override public void setUserId(String userId) { this.userId = userId; }
+    public String getPassword() { return password; } //
+    public void setPassword(String password) { this.password = password; }
     @Override public String getName() { return name; }
     @Override public void setName(String name) { this.name = name; }
-    @Override public List<BorrowRecord> getBorrowRecord() { return borrowRecord; }
+    @Override public List<BorrowRecord> getBorrowRecord(){return borrowRecord;}
 
     @Override
     public List<LibraryItem> getBorrowedItems() {
