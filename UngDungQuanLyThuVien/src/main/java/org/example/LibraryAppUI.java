@@ -4,6 +4,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.List;
 import javax.swing.table.DefaultTableModel;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
 public class LibraryAppUI {
     private final Library library = Library.getInstance();
@@ -11,6 +13,7 @@ public class LibraryAppUI {
     private CardLayout cardLayout;
     private JPanel mainPanel;
     private boolean isAdminLoggedIn = false;
+    private LibraryUserImpl currentUser; // Người dùng hiện tại
 
     private JButton btnLoginAdmin;
     private JButton btnLogoutAdmin;
@@ -23,16 +26,6 @@ public class LibraryAppUI {
     private JButton btnDisplayBorrowRecords;
     private JButton btnExitAdmin;
 
-    private void showAdminButtons(boolean show) {
-        btnAddDocument.setVisible(show);
-        btnRemoveDocument.setVisible(show);
-        btnUpdateDocument.setVisible(show);
-        btnDisplayDocuments.setVisible(show);
-        btnSearchGoogleBooks.setVisible(show);
-        btnAddUser.setVisible(show);
-        btnDisplayBorrowRecords.setVisible(show);
-        btnLogoutAdmin.setVisible(show);
-    }
 
     public LibraryAppUI() {
         frame = new JFrame("📚 Library Management System");
@@ -143,70 +136,129 @@ public class LibraryAppUI {
         panel.add(title);
         panel.add(Box.createRigidArea(new Dimension(0, 20)));
 
-        String[] buttonLabels = {
-                "Login",
-                "Logout",
-                "Add Document",
-                "Remove Document",
-                "Update Document",
-                "Display Documents",
-                "Search Google Books",
-                "Add User",
-                "Display Borrow Records",
-                "Exit"
-        };
-
         Font btnFont = new Font("Segoe UI", Font.BOLD, 16);
 
-        for (int i = 0; i < buttonLabels.length; i++) {
-            JButton button = new JButton(buttonLabels[i]);
-            button.setFont(btnFont);
-            button.setAlignmentX(Component.CENTER_ALIGNMENT);
-            button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 45));
-            button.setFocusPainted(false);
-            button.setBackground(new Color(200, 220, 240));
-            button.setForeground(Color.BLACK);
-            button.setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createLineBorder(new Color(160, 180, 200)),
-                    BorderFactory.createEmptyBorder(8, 10, 8, 10)
-            ));
+        // Tạo các nút (dùng anonymous class thay vì lambda)
+        btnLoginAdmin = createAdminButton("Login", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                loginAdmin();
+            }
+        });
+        btnLogoutAdmin = createAdminButton("Logout", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                logoutAdmin();
+            }
+        });
+        btnAddDocument = createAdminButton("Add Document", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                addDocument();
+            }
+        });
+        btnRemoveDocument = createAdminButton("Remove Document", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                removeDocument();
+            }
+        });
+        btnUpdateDocument = createAdminButton("Update Document", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                updateDocument();
+            }
+        });
+        btnDisplayDocuments = createAdminButton("Display Documents", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                displayDocuments();
+            }
+        });
+        btnSearchGoogleBooks = createAdminButton("Search Google Books", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                searchGoogleBooks();
+            }
+        });
+        btnAddUser = createAdminButton("Add User", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                addUser();
+            }
+        });
+        btnDisplayBorrowRecords = createAdminButton("Display Borrow Records", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                displayBorrowRecords();
+            }
+        });
+        btnExitAdmin = createAdminButton("Exit", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                cardLayout.show(mainPanel, "welcome");
+            }
+        });
 
-            int index = i;
-            button.addActionListener(e -> handleAdminOption(index));
+        // Thêm nút vào panel
+        panel.add(btnLoginAdmin);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnLogoutAdmin);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnAddDocument);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnRemoveDocument);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnUpdateDocument);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnDisplayDocuments);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnSearchGoogleBooks);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnAddUser);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnDisplayBorrowRecords);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnExitAdmin);
 
-            panel.add(button);
-            panel.add(Box.createRigidArea(new Dimension(0, 10)));
-        }
-
-        panel.add(Box.createRigidArea(new Dimension(0, 20)));
-        JButton backBtn = new JButton("Back to Welcome");
-        backBtn.setFont(new Font("Segoe UI", Font.PLAIN, 18));
-        backBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        backBtn.addActionListener(e -> cardLayout.show(mainPanel, "welcome"));
-
-        panel.add(backBtn);
+        // Ban đầu chỉ hiện Login + Exit
+        showAdminButtons(false);
+        btnLoginAdmin.setVisible(true);
+        btnExitAdmin.setVisible(true);
 
         return panel;
     }
 
-    /** Xử lý chức năng admin */
-    private void handleAdminOption(int option) {
-        switch (option) {
-            case 0 -> loginAdmin();
-            case 1 -> logoutAdmin();
-            case 2 -> addDocument();
-            case 3 -> removeDocument();
-            case 4 -> updateDocument();
-            case 5 -> displayDocuments();
-            case 6 -> searchGoogleBooks();
-            case 7 -> addUser();
-            case 8 -> displayBorrowRecords();
-            case 9 -> cardLayout.show(mainPanel, "welcome");
-            case 10 -> System.exit(0);
-            default -> JOptionPane.showMessageDialog(frame, "Invalid option");
-        }
+    /** Hàm tạo nút Admin */
+    private JButton createAdminButton(String text, Font font, ActionListener listener) {
+        JButton button = new JButton(text);
+        button.setFont(font);
+        button.setAlignmentX(Component.CENTER_ALIGNMENT);
+        button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 45));
+        button.setFocusPainted(false);
+        button.setBackground(new Color(200, 220, 240));
+        button.setForeground(Color.BLACK);
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(160, 180, 200)),
+                BorderFactory.createEmptyBorder(8, 10, 8, 10)
+        ));
+        button.addActionListener(listener);
+        return button;
     }
 
+    /** Hiển thị hoặc ẩn các nút chức năng (trừ Login & Exit) */
+    private void showAdminButtons(boolean show) {
+        btnLogoutAdmin.setVisible(show);
+        btnAddDocument.setVisible(show);
+        btnRemoveDocument.setVisible(show);
+        btnUpdateDocument.setVisible(show);
+        btnDisplayDocuments.setVisible(show);
+        btnSearchGoogleBooks.setVisible(show);
+        btnAddUser.setVisible(show);
+        btnDisplayBorrowRecords.setVisible(show);
+    }
+
+    /** Login Admin */
     private void loginAdmin() {
         JTextField usernameField = new JTextField();
         JPasswordField passwordField = new JPasswordField();
@@ -226,17 +278,22 @@ public class LibraryAppUI {
             if (username.equals("admin") && password.equals("1234")) {
                 isAdminLoggedIn = true;
                 JOptionPane.showMessageDialog(frame, "Login successful");
-                showAdminButtons(true);
+                showAdminButtons(true); // Hiện các nút chức năng
+                btnLoginAdmin.setVisible(false); // Ẩn nút login
             } else {
                 JOptionPane.showMessageDialog(frame, "Invalid admin credentials");
             }
         }
     }
 
-
     private void logoutAdmin() {
+        isAdminLoggedIn = false;
+        showAdminButtons(false); // Ẩn các nút chức năng
+        btnLoginAdmin.setVisible(true); // Hiện lại nút login
+        btnExitAdmin.setVisible(true);  // Đảm bảo nút Exit vẫn hiện
+
         JOptionPane.showMessageDialog(frame, "Admin has been logged out.");
-        cardLayout.show(mainPanel, "welcome");
+        cardLayout.show(mainPanel, "admin"); // Quay lại admin panel
     }
 
     private void addDocument() {
@@ -536,6 +593,15 @@ public class LibraryAppUI {
     }
 
     /** Màn hình User */
+    // Nút cho User Panel
+    private JButton btnSigninUser;
+    private JButton btnLoginUser;
+    private JButton btnLogoutUser;
+    private JButton btnDisplayDocs;
+    private JButton btnReturnDoc;
+    private JButton btnUserInfo;
+    private JButton btnExitUser;
+
     private JPanel createUserPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
@@ -549,66 +615,100 @@ public class LibraryAppUI {
         panel.add(title);
         panel.add(Box.createRigidArea(new Dimension(0, 20)));
 
-        String[] userOptions = {
-                "Signin",
-                "Login",
-                "Logout",
-                "Display Document",
-                "Return Document",
-                "Display User Info",
-                "Exit"
-        };
-
         Font btnFont = new Font("Segoe UI", Font.BOLD, 16);
 
-        for (int i = 0; i < userOptions.length; i++) {
-            JButton btn = new JButton(userOptions[i]);
-            btn.setFont(btnFont);
-            btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-            btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 45));
-            btn.setFocusPainted(false);
-            btn.setBackground(new Color(200, 220, 240));
-            btn.setForeground(Color.BLACK);
-            btn.setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createLineBorder(new Color(160, 180, 200)),
-                    BorderFactory.createEmptyBorder(8, 10, 8, 10)
-            ));
+        // Tạo các nút
+        btnSigninUser = createUserButton("Sign in", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                signinUser();
+            }
+        });
+        btnLoginUser = createUserButton("Login", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                loginUser();
+            }
+        });
+        btnLogoutUser = createUserButton("Logout", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                logoutUser();
+            }
+        });
+        btnDisplayDocs = createUserButton("Display Document", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                displayDocuments();
+            }
+        });
+        btnReturnDoc = createUserButton("Return Document", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                returnDocument();
+            }
+        });
+        btnUserInfo = createUserButton("Display User Info", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                displayUserInfo();
+            }
+        });
+        btnExitUser = createUserButton("Exit", btnFont, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                cardLayout.show(mainPanel, "welcome");
+            }
+        });
 
-            int index = i;
-            btn.addActionListener(e -> handleUserOption(index));
+        // Thêm nút vào panel
+        panel.add(btnSigninUser);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnLoginUser);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnLogoutUser);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnDisplayDocs);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnReturnDoc);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnUserInfo);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+        panel.add(btnExitUser);
 
-            panel.add(Box.createRigidArea(new Dimension(0, 10)));
-            panel.add(btn);
-        }
-
-        panel.add(Box.createRigidArea(new Dimension(0, 20)));
-        JButton backBtn = new JButton("Back to Welcome");
-        backBtn.setFont(new Font("Segoe UI", Font.PLAIN, 18));
-        backBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        backBtn.addActionListener(e -> cardLayout.show(mainPanel, "welcome"));
-
-        panel.add(backBtn);
+        // Ban đầu chỉ hiện Sign in, Login, Exit
+        showUserButtons(false);
+        btnSigninUser.setVisible(true);
+        btnLoginUser.setVisible(true);
+        btnExitUser.setVisible(true);
 
         return panel;
     }
 
-    /** Xử lý chức năng User */
-    private void handleUserOption(int option) {
-        switch (option) {
-            case 0 -> signinUser();
-            case 1 -> loginUser();
-            case 2 -> logoutUser();
-            case 3 -> displayDocuments();
-            case 4 -> returnDocument();
-            case 5 -> displayUserInfo();
-            case 6 -> searchGoogleBooks();
-            case 7 -> System.exit(0);
-            default -> JOptionPane.showMessageDialog(frame, "Invalid option");
-        }
+    /** Hàm tạo nút user */
+    private JButton createUserButton(String text, Font font, ActionListener listener) {
+        JButton button = new JButton(text);
+        button.setFont(font);
+        button.setAlignmentX(Component.CENTER_ALIGNMENT);
+        button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 45));
+        button.setFocusPainted(false);
+        button.setBackground(new Color(200, 220, 240));
+        button.setForeground(Color.BLACK);
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(160, 180, 200)),
+                BorderFactory.createEmptyBorder(8, 10, 8, 10)
+        ));
+        button.addActionListener(listener);
+        return button;
     }
 
-    private LibraryUserImpl currentUser;
-//    private Library library = Library.getInstance();
+    /** Ẩn/hiện nút chức năng User (trừ Sign in, Login, Exit) */
+    private void showUserButtons(boolean show) {
+        btnLogoutUser.setVisible(show);
+        btnDisplayDocs.setVisible(show);
+        btnReturnDoc.setVisible(show);
+        btnUserInfo.setVisible(show);
+    }
 
     // Sign in (đặt mật khẩu lần đầu)
     private void signinUser() {
@@ -639,7 +739,8 @@ public class LibraryAppUI {
         JOptionPane.showMessageDialog(null, "Password set successfully! You can now log in.");
     }
 
-    // Login (đăng nhập)
+
+    /** Login User */
     private void loginUser() {
         String userId = JOptionPane.showInputDialog("Enter your User ID:");
         if (userId == null || userId.trim().isEmpty()) return;
@@ -667,16 +768,20 @@ public class LibraryAppUI {
 
         currentUser = existingUser;
         JOptionPane.showMessageDialog(null, "Welcome, " + currentUser.getName() + "!");
+        showUserButtons(true); // Hiện các nút chức năng
+        btnSigninUser.setVisible(false);
+        btnLoginUser.setVisible(false);
     }
 
+    /** Logout User */
     private void logoutUser() {
-        if (currentUser != null) {
-            JOptionPane.showMessageDialog(null, "Tạm biệt, " + currentUser.getName() + "!");
-            currentUser = null;
-        } else {
-            JOptionPane.showMessageDialog(null, "Bạn chưa đăng nhập!");
-        }
+        currentUser = null;
+        showUserButtons(false); // Ẩn các nút chức năng
+        btnSigninUser.setVisible(true);
+        btnLoginUser.setVisible(true);
+        JOptionPane.showMessageDialog(frame, "You have been logged out.");
     }
+
 
     private void returnDocument() {
         LibraryUser user = Session.getCurrentUser();
@@ -757,4 +862,3 @@ public class LibraryAppUI {
         SwingUtilities.invokeLater(LibraryAppUI::new);
     }
 }
-
