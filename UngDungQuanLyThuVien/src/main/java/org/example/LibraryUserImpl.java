@@ -7,6 +7,7 @@ import java.util.List;
 public class LibraryUserImpl implements LibraryUser {
     private String userId;
     private String name;
+    private String password;
     private List<BorrowRecord> borrowRecords = new ArrayList<>();
 
     // Static user đang đăng nhập
@@ -48,6 +49,14 @@ public class LibraryUserImpl implements LibraryUser {
     @Override
     public List<BorrowRecord> getBorrowRecord() {
         return borrowRecords;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 
     // Lấy danh sách tất cả LibraryItem đang mượn
