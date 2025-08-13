@@ -5,11 +5,12 @@ import java.awt.*;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.Calendar;
-import java.util.Calendar;
 import java.util.List;
 import java.util.Date;
 import java.util.Map;
-import java.util.LinkedHashMap;
+import java.util.Optional;
+import java.util.ArrayList;
+import java.util.Collections;
 
 import javax.swing.table.DefaultTableModel;
 import java.awt.image.BufferedImage;
@@ -60,10 +61,8 @@ public class LibraryGUI {
                 "➕📄 Add Document",
                 "❌📄 Remove Document",
                 "✏️📄 Update Document",
-                "🔍📄 Find Document",
                 "📚 Display Documents",
                 "➕👤 Add User",
-                "📖➡️👤 Borrow Document",
                 "🔙📖 Return Document",
                 "👤ℹ️ Display User Info",
                 "🔍📘 Search Google Books",
@@ -105,15 +104,13 @@ public class LibraryGUI {
             case 2 -> addDocument();
             case 3 -> removeDocument();
             case 4 -> updateDocument();
-            case 5 -> findDocument();
-            case 6 -> displayDocuments();
-            case 7 -> addUser();
-            case 8 -> borrowDocument();
-            case 9 -> returnDocument();
-            case 10 -> displayUserInfo();
-            case 11 -> searchGoogleBooks();
-            case 12 -> displayBorrowRecords();
-            case 13 -> System.exit(0);
+            case 5 -> displayDocuments();
+            case 6 -> addUser();
+            case 7 -> returnDocument();
+            case 8 -> displayUserInfo();
+            case 9 -> searchGoogleBooks();
+            case 10 -> displayBorrowRecords();
+            case 11 -> System.exit(0);
             default -> JOptionPane.showMessageDialog(null, "Invalid option");
         }
     }
@@ -178,6 +175,7 @@ public class LibraryGUI {
         String quantityStr = JOptionPane.showInputDialog("Enter quantity:");
         if (quantityStr == null) return;
 
+        String thumbnailLink = JOptionPane.showInputDialog("Enter thumbnail link:");
         int quantity;
         try {
             quantity = Integer.parseInt(quantityStr);
@@ -186,7 +184,7 @@ public class LibraryGUI {
             return;
         }
 
-        Book book = new Book(title, authors, category, isbn, quantity, ""); // imageUrl không cần thiết ở đây
+        Book book = new Book(title, authors, category, isbn, quantity, thumbnailLink);
 
         try {
             new BookDAO().insertBook(book); // ghi DB
@@ -258,12 +256,6 @@ public class LibraryGUI {
         }
     }
 
-    private void findDocument() {
-        String title = JOptionPane.showInputDialog("Enter title to find:");
-        var item = library.findItemByTitle(title);
-        JOptionPane.showMessageDialog(null, item != null ? item.toString() : "Not found.");
-    }
-
     private void displayDocuments() {
         List<LibraryItem> items = library.getItems();
         if (items == null || items.isEmpty()) {
@@ -271,31 +263,142 @@ public class LibraryGUI {
             return;
         }
 
-        // Panel danh sách (xếp dọc)
-        JPanel listPanel = new JPanel();
+        // Snapshot các Book để dùng khi query rỗng
+        final List<Book> allBooks = new ArrayList<>();
+        for (LibraryItem li : items) {
+            if (li instanceof Book b) allBooks.add(b);
+        }
+
+        // Panel danh sách
+        final JPanel listPanel = new JPanel();
         listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
         listPanel.setBackground(Color.WHITE);
 
-        for (LibraryItem li : items) {
-            if (!(li instanceof Book b)) continue;
+        final JScrollPane scrollPane = new JScrollPane(listPanel);
+        scrollPane.setPreferredSize(new Dimension(900, 650));
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
 
+        // Top bar: label + field + (Search | Clear)
+        final JPanel topBar = new JPanel(new BorderLayout(8, 8));
+        topBar.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        topBar.setBackground(Color.WHITE);
+
+        final JTextField searchField = new JTextField();
+        searchField.putClientProperty("JTextField.placeholderText", "Search by title, author, ISBN…");
+        searchField.setToolTipText("Type your query, then press Search or Enter.");
+
+        final JButton searchBtn = new JButton("Search");
+        searchBtn.setFocusable(false);
+
+        final JButton clearBtn = new JButton("Clear");
+        clearBtn.setFocusable(false);
+
+        final JPanel rightTop = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        rightTop.setOpaque(false);
+        rightTop.add(searchBtn);
+        rightTop.add(clearBtn);
+
+        topBar.add(new JLabel("Search:"), BorderLayout.WEST);
+        topBar.add(searchField, BorderLayout.CENTER);
+        topBar.add(rightTop, BorderLayout.EAST);
+
+        // Dialog
+        final JDialog dialog = new JDialog((Frame) null, "Library Books", true);
+        final JPanel root = new JPanel(new BorderLayout());
+        root.setBackground(Color.WHITE);
+        root.add(topBar, BorderLayout.NORTH);
+        root.add(scrollPane, BorderLayout.CENTER);
+        dialog.setContentPane(root);
+        dialog.pack();
+        dialog.setLocationRelativeTo(null);
+
+        // Render lần đầu: hiển thị tất cả
+        renderBooks(listPanel, allBooks);
+        listPanel.revalidate();
+        listPanel.repaint();
+        SwingUtilities.invokeLater(() -> {
+            scrollPane.getViewport().setViewPosition(new Point(0, 0));
+            scrollPane.getVerticalScrollBar().setValue(0);
+        });
+
+        // ---- Chỉ tìm khi bấm Search / Enter ----
+        final Runnable doSearch = () -> {
+            String q = searchField.getText().trim();
+            List<Book> toShow = q.isEmpty()
+                    ? allBooks
+                    : Optional.ofNullable(library.search(q)).orElse(Collections.emptyList());
+            renderBooks(listPanel, toShow);
+            SwingUtilities.invokeLater(() -> {
+                scrollPane.getViewport().setViewPosition(new Point(0, 0));
+                scrollPane.getVerticalScrollBar().setValue(0);
+            });
+        };
+
+        // Bấm nút Search
+        searchBtn.addActionListener(ev -> doSearch.run());
+
+        // Nhấn Enter trong ô search
+        searchField.addActionListener(ev -> doSearch.run());
+
+        // Esc: chỉ clear text (không tự tìm)
+        KeyStroke esc = KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0);
+        searchField.getInputMap(JComponent.WHEN_FOCUSED).put(esc, "clearSearch");
+        searchField.getActionMap().put("clearSearch", new AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) {
+                if (!searchField.getText().isEmpty()) {
+                    searchField.setText("");
+                }
+            }
+        });
+
+        // Nút Clear: xoá và hiển thị lại tất cả
+        clearBtn.addActionListener(ev -> {
+            if (!searchField.getText().isEmpty()) searchField.setText("");
+            renderBooks(listPanel, allBooks);
+            SwingUtilities.invokeLater(() -> {
+                scrollPane.getViewport().setViewPosition(new Point(0, 0));
+                scrollPane.getVerticalScrollBar().setValue(0);
+            });
+        });
+
+        // Focus vào ô search khi mở
+        dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowOpened(java.awt.event.WindowEvent e) {
+                SwingUtilities.invokeLater(searchField::requestFocusInWindow);
+            }
+        });
+
+        dialog.setVisible(true);
+    }
+
+
+    // === CHỈ GIỮ MỘT BẢN renderBooks NÀY TRONG CLASS ===
+    private void renderBooks(JPanel listPanel, List<Book> books) {
+        listPanel.removeAll();
+
+        if (books == null || books.isEmpty()) {
+            JLabel empty = new JLabel("No results.");
+            empty.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+            listPanel.add(empty);
+            listPanel.revalidate();
+            listPanel.repaint();
+            return;
+        }
+
+        for (Book b : books) {
             // BookPanel có nút Borrow
             BookPanel bookPanel = new BookPanel(b, true);
 
-            // Card bọc BookPanel + QR bên phải
             JPanel card = new JPanel(new BorderLayout(12, 12));
             card.setBackground(Color.WHITE);
             card.setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createLineBorder(new Color(220, 220, 220)),
                     BorderFactory.createEmptyBorder(10, 10, 10, 10)
             ));
-
-            // BookPanel ở giữa (tự hiển thị ảnh + info + Borrow như bạn đã làm)
             card.add(bookPanel, BorderLayout.CENTER);
 
             // QR code bên phải
             try {
-                // Nội dung QR: tùy bạn. Ví dụ: ưu tiên ID/ISBN, fallback toString()
                 String qrContent = (b.getId() != null && !b.getId().isBlank()) ? ("BOOK_ID:" + b.getId())
                         : (b.getIsbn() != null && !b.getIsbn().isBlank() && !"N/A".equalsIgnoreCase(b.getIsbn())) ? ("ISBN:" + b.getIsbn())
                         : b.toString();
@@ -304,36 +407,16 @@ public class LibraryGUI {
                 JLabel qrLabel = new JLabel(new ImageIcon(qr));
                 qrLabel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
                 card.add(qrLabel, BorderLayout.EAST);
-            } catch (Exception e) {
-                System.err.println("Failed to generate QR code: " + e.getMessage());
+            } catch (Exception ex) {
+                System.err.println("Failed to generate QR code: " + ex.getMessage());
             }
 
             listPanel.add(card);
-            listPanel.add(Box.createVerticalStrut(10)); // khoảng cách giữa các card
+            listPanel.add(Box.createVerticalStrut(10));
         }
 
-        // ScrollPane + dialog (một trang duy nhất)
-        JScrollPane scrollPane = new JScrollPane(listPanel);
-        scrollPane.setPreferredSize(new Dimension(900, 650));
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-
-        JDialog dialog = new JDialog((Frame) null, "Library Books", true);
-        dialog.getContentPane().add(scrollPane);
-        dialog.pack();
-        dialog.setLocationRelativeTo(null);
-
-        // đảm bảo cuộn về đầu khi mở
-        dialog.addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override
-            public void windowOpened(java.awt.event.WindowEvent e) {
-                SwingUtilities.invokeLater(() -> {
-                    scrollPane.getViewport().setViewPosition(new Point(0, 0));
-                    scrollPane.getVerticalScrollBar().setValue(0);
-                });
-            }
-        });
-
-        dialog.setVisible(true);
+        listPanel.revalidate();
+        listPanel.repaint();
     }
 
     private void addUser() {
@@ -355,95 +438,55 @@ public class LibraryGUI {
         }
     }
 
-    private void borrowDocument() {
-        // 1) Lấy user từ Session
-        LibraryUser user = Session.getCurrentUser();
-        if (user == null) {
-            JOptionPane.showMessageDialog(null, "No user logged in. Please login first.");
-            return;
-        }
-
-        // 2) Lọc sách còn hàng
-        List<Book> availableBooks = library.getItems().stream()
-                .filter(i -> i instanceof Book && i.getQuantity() > 0)
-                .map(i -> (Book) i)
-                .toList();
-
-        if (availableBooks.isEmpty()) {
-            JOptionPane.showMessageDialog(null, "No available books to borrow.");
-            return;
-        }
-
-        // 3) Tạo label -> Book để hiển thị và tra ngược chính xác
-        Map<String, Book> labelToBook = new LinkedHashMap<>();
-        for (Book b : availableBooks) {
-            String label = b.getTitle() + " — ISBN: " + b.getIsbn() + " — Qty: " + b.getQuantity();
-            labelToBook.put(label, b);
-        }
-
-        String[] options = labelToBook.keySet().toArray(new String[0]);
-        String selected = (String) JOptionPane.showInputDialog(
-                null, "Select book to borrow:", "Borrow Document",
-                JOptionPane.PLAIN_MESSAGE, null, options, options[0]
-        );
-        if (selected == null) return;
-
-        Book selectedBook = labelToBook.get(selected);
-        if (selectedBook == null) {
-            JOptionPane.showMessageDialog(null, "Book not found.");
-            return;
-        }
-
-        // 4) Ghi DB trước, rồi cập nhật bộ nhớ
-        try {
-            new UserDAO().borrowBook(user.getUserId(), selectedBook.getIsbn(), java.time.LocalDate.now()); // DB
-            user.borrowBook(selectedBook); // bộ nhớ (giảm quantity, lưu bản ghi mượn trong session)
-            JOptionPane.showMessageDialog(null,
-                    "Book borrowed.\nRemaining quantity: " + selectedBook.getQuantity());
-        } catch (java.sql.SQLException e) {
-            JOptionPane.showMessageDialog(null, "DB error: " + e.getMessage());
-        }
-    }
 
     private void returnDocument() {
-        // 1) Kiểm tra đăng nhập
         LibraryUser lu = Session.getCurrentUser();
         if (lu == null) {
             JOptionPane.showMessageDialog(null, "No user logged in. Please login first.");
             return;
         }
-        // Ép kiểu nếu bạn dùng class User riêng (để lấy name, record,...)
-        User user = (lu instanceof User u) ? u : null;
 
-        // 2) Lấy danh sách đang mượn
-        List<LibraryItem> borrowedItems = lu.getBorrowedBooks();
-        if (borrowedItems == null || borrowedItems.isEmpty()) {
-            JOptionPane.showMessageDialog(null, "You have not borrowed any documents.");
-            return;
-        }
-
-        // 3) Chuẩn bị bảng
-        String[] columns = {"ID/ISBN", "Title", "Type", "Author(s)"};
+        // Model & Table
+        String[] columns = {"ID", "Title", "Type", "Author(s)"};
         DefaultTableModel model = new DefaultTableModel(columns, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
-        for (LibraryItem it : borrowedItems) {
-            model.addRow(new Object[]{
-                    it.getId() != null ? it.getId() : it.getIsbn(), // ưu tiên id, fallback isbn
-                    it.getTitle(),
-                    it.getClass().getSimpleName(),
-                    it.getAuthors()
-            });
-        }
-
         JTable table = new JTable(model);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         JScrollPane scroll = new JScrollPane(table);
 
-        JButton btnReturnOne = new JButton("Return Selected Document");
-        JButton btnReturnAll = new JButton("Return All Documents");
+        // Nguồn dữ liệu hiển thị
+        final List<LibraryItem> borrowedItems = new ArrayList<>();
 
-        // 4) Hành vi nút "Return Selected"
+        // Helper: nạp lại danh sách ĐANG MƯỢN từ DB và render vào bảng
+        Runnable reloadBorrowedTable = () -> {
+            borrowedItems.clear();
+            model.setRowCount(0);
+            try {
+                UserDAO dao = new UserDAO();
+                // lấy tất cả record của user rồi lọc active (hoặc thay bằng dao.getActiveBorrowRecords(...))
+                for (BorrowRecord br : dao.getBorrowRecords(lu.getUserId())) {
+                    if (br.getReturnDate() == null && br.getBook() != null) {
+                        LibraryItem it = br.getBook();
+                        borrowedItems.add(it);
+                        model.addRow(new Object[]{ it.getId(), it.getTitle(),
+                                it.getClass().getSimpleName(), it.getAuthors() });
+                    }
+                }
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(null, "Error loading borrowed documents: " + ex.getMessage());
+            }
+        };
+
+        // Lần đầu mở
+        reloadBorrowedTable.run();
+        if (borrowedItems.isEmpty()) {
+            JOptionPane.showMessageDialog(null, "You have no active borrowed documents.");
+            return;
+        }
+
+        // Nút trả 1
+        JButton btnReturnOne = new JButton("Return Selected Document");
         btnReturnOne.addActionListener(e -> {
             int row = table.getSelectedRow();
             if (row < 0) {
@@ -451,66 +494,64 @@ public class LibraryGUI {
                 return;
             }
             LibraryItem item = borrowedItems.get(row);
-
             try {
-                // Cập nhật DB
-                if (item instanceof Book b) {
-                    new UserDAO().returnBook(lu.getUserId(), b.getIsbn());
-                } else {
-                    // nếu có loại khác, xử lý ở đây (ví dụ theo item.getId())
+                if (!(item instanceof Book b)) {
                     throw new IllegalStateException("Unsupported item type: " + item.getClass().getSimpleName());
                 }
+                String idStr = b.getId();
+                if (idStr == null || idStr.isBlank()) {
+                    JOptionPane.showMessageDialog(null, "Book has no DB id. Please reload.");
+                    return;
+                }
 
-                // Cập nhật bộ nhớ
-                lu.returnItem(item);                  // remove khỏi danh sách của user, +1 qty nếu bạn làm ở đây
-                LibraryItem libItem = library.findItemByIsbn(item.getIsbn());
-                if (libItem != null) libItem.setQuantity(libItem.getQuantity() + 1); // phòng khi returnItem không +1
+                new UserDAO().returnBookByBookId(lu.getUserId(), Integer.parseInt(idStr)); // DB
+                lu.returnItem(item); // RAM (xóa theo id trong implement của bạn)
 
-                // Cập nhật UI
-                model.removeRow(row);
-                borrowedItems.remove(row);
-
+                reloadBorrowedTable.run(); // UI cập nhật ngay
                 JOptionPane.showMessageDialog(null, "Document returned successfully.");
+
+                if (borrowedItems.isEmpty()) {
+                    // không còn gì để trả, có thể tắt dialog bằng cách đóng JOptionPane cha nếu bạn muốn
+                }
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(null, "DB error: " + ex.getMessage());
+                String msg = String.valueOf(ex.getMessage());
+                if (msg.contains("Already returned") || msg.contains("No active borrow")) {
+                    // Dữ liệu đã được trả ở nơi khác → dọn UI
+                    reloadBorrowedTable.run();
+                    JOptionPane.showMessageDialog(null, "This item was already returned. List refreshed.");
+                } else {
+                    JOptionPane.showMessageDialog(null, "DB error: " + msg);
+                }
             }
         });
 
-        // 5) Hành vi nút "Return All"
+        // Nút trả tất cả
+        JButton btnReturnAll = new JButton("Return All Documents");
         btnReturnAll.addActionListener(e -> {
             int confirm = JOptionPane.showConfirmDialog(
-                    null,
-                    "Are you sure you want to return all borrowed documents?",
-                    "Confirm Return All",
-                    JOptionPane.YES_NO_OPTION
-            );
+                    null, "Return ALL borrowed documents?", "Confirm", JOptionPane.YES_NO_OPTION);
             if (confirm != JOptionPane.YES_OPTION) return;
 
             int success = 0, failed = 0;
 
-            // duyệt từ cuối về đầu để remove row an toàn
-            for (int i = borrowedItems.size() - 1; i >= 0; i--) {
-                LibraryItem item = borrowedItems.get(i);
+            // snapshot để tránh ConcurrentModification
+            List<LibraryItem> snapshot = new ArrayList<>(borrowedItems);
+            for (LibraryItem item : snapshot) {
                 try {
-                    if (item instanceof Book b) {
-                        new UserDAO().returnBook(lu.getUserId(), b.getIsbn());
-                    } else {
-                        throw new IllegalStateException("Unsupported item type: " + item.getClass().getSimpleName());
-                    }
-                    lu.returnItem(item);
-                    LibraryItem libItem = library.findItemByIsbn(item.getIsbn());
-                    if (libItem != null) libItem.setQuantity(libItem.getQuantity() + 1);
+                    if (!(item instanceof Book b)) throw new IllegalStateException("Unsupported item type.");
+                    String idStr = b.getId();
+                    if (idStr == null || idStr.isBlank()) throw new IllegalStateException("Book has no DB id.");
 
-                    model.removeRow(i);
-                    borrowedItems.remove(i);
+                    new UserDAO().returnBookByBookId(lu.getUserId(), Integer.parseInt(idStr)); // DB
+                    lu.returnItem(item); // RAM
                     success++;
                 } catch (Exception ex2) {
                     failed++;
                 }
             }
 
-            String msg = "All documents returned successfully.";
-            if (failed > 0) msg = "Returned: " + success + ", Failed: " + failed;
+            reloadBorrowedTable.run(); // làm sạch bảng ngay
+            String msg = (failed == 0) ? "All documents returned." : "Returned: " + success + ", Failed: " + failed;
             JOptionPane.showMessageDialog(null, msg);
         });
 
@@ -650,12 +691,15 @@ public class LibraryGUI {
 
         System.out.println("DEBUG: Number of users = " + users.size());
 
+        StringBuilder overdueBuilder = new StringBuilder();
+        StringBuilder normalBuilder  = new StringBuilder();
+        Date now = new Date();
+
         for (LibraryUser user : users) {
             List<BorrowRecord> brs = user.getBorrowRecord();
 
             for (BorrowRecord br : brs) {
-                LibraryItem item = br.getItem();
-
+                LibraryItem item = br.getBook();
                 if (item instanceof Book) {
                     Book book = (Book) item;
                     Date borrowDate = br.getBorrowDate();
@@ -664,23 +708,24 @@ public class LibraryGUI {
                     calendar.setTime(borrowDate);
                     calendar.add(Calendar.DAY_OF_MONTH, 14);
                     Date returnDate = calendar.getTime();
-                    Date now = new Date();
 
-                    builder.append("User: ").append(user.getName()).append("\n");
-                    builder.append("Book: ").append(book.toString()).append("\n");
-                    builder.append("Borrowed on: ").append(borrowDate.toString()).append("\n");
-                    builder.append("Returned on: ").append(returnDate.toString()).append("\n");
+                    boolean overdue = returnDate.before(now);
 
-                    if (returnDate.before(now)) {
-                        builder.append("Overdue").append("\n");
-                    }
-
-                    builder.append("-----------------------------\n");
+                    StringBuilder target = overdue ? overdueBuilder : normalBuilder;
+                    target.append("User: ").append(user.getName()).append("\n");
+                    target.append("Book: ").append(book.toString()).append("\n");
+                    target.append("Borrowed on: ").append(borrowDate.toString()).append("\n");
+                    target.append("Return by: ").append(returnDate.toString()).append("\n");
+                    if (overdue) target.append("⚠ Overdue\n");
+                    target.append("-----------------------------\n");
                 }
             }
         }
 
-        String message = builder.length() > 0 ? builder.toString() : "No documents.";
+
+        String message = (overdueBuilder.length() > 0 || normalBuilder.length() > 0)
+                ? overdueBuilder.append(normalBuilder).toString()
+                : "No documents.";
 
         JTextArea textArea = new JTextArea(message);
         textArea.setFont(new Font("Segoe UI", Font.PLAIN, 14)); // Font hỗ trợ Unicode

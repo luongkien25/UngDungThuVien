@@ -1,4 +1,4 @@
-package org.example;
+/**package org.example;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -55,7 +55,7 @@ public class LibraryUserImpl implements LibraryUser {
     public List<LibraryItem> getBorrowedItems() {
         List<LibraryItem> items = new ArrayList<>();
         for (BorrowRecord record : borrowRecords) {
-            items.add(record.getItem());
+            items.add(record.getBook());
         }
         return items;
     }
@@ -64,8 +64,8 @@ public class LibraryUserImpl implements LibraryUser {
     public List<LibraryItem> getBorrowedBooks() {
         List<LibraryItem> books = new ArrayList<>();
         for (BorrowRecord record : borrowRecords) {
-            if (record.getItem() instanceof Book) {
-                books.add(record.getItem()); // vẫn là LibraryItem
+            if (record.getBook() instanceof Book) {
+                books.add(record.getBook()); // vẫn là LibraryItem
             }
         }
         return books;
@@ -80,11 +80,11 @@ public class LibraryUserImpl implements LibraryUser {
     // Trả một item
     @Override
     public void returnItem(LibraryItem item) {
-        borrowRecords.removeIf(r -> r.getItem().equals(item));
+        borrowRecords.removeIf(r -> r.getBook().equals(item));
     }
 
     @Override
     public String toString() {
         return "User: " + name + " (ID: " + userId + ")";
     }
-}
+}*/

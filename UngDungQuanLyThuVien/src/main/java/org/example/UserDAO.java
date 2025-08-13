@@ -23,13 +23,17 @@ public class UserDAO {
 
     public List<BorrowRecord> getBorrowRecords(String userId) throws SQLException {
         String sql = """
-            SELECT br.id, br.borrow_date,
-                   b.isbn, b.title, b.authors, b.category, b.quantity, b.thumbnail_link
-            FROM borrow_records br
-            JOIN books b ON b.isbn = br.isbn
-            WHERE br.user_id = ?
-            ORDER BY br.borrow_date DESC, br.id DESC
-            """;
+    SELECT br.id,
+           br.borrow_date,
+           br.due_date,        -- thêm
+           br.return_date,
+           b.id AS book_id,
+           b.isbn, b.title, b.authors, b.category, b.quantity, b.thumbnail_link
+      FROM borrow_records br
+      JOIN books b ON b.id = br.book_id
+     WHERE br.user_id = ?
+     ORDER BY br.borrow_date DESC, br.id DESC
+""";
         List<BorrowRecord> list = new ArrayList<>();
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -44,8 +48,17 @@ public class UserDAO {
                             rs.getInt("quantity"),
                             rs.getString("thumbnail_link")
                     );
-                    java.sql.Date d = rs.getDate("borrow_date");
-                    list.add(new BorrowRecord(book, new java.util.Date(d.getTime())));
+                    book.setId(String.valueOf(rs.getInt("book_id")));
+
+                    Date borrow = new Date(rs.getTimestamp("borrow_date").getTime());
+
+                    java.sql.Timestamp dueTs = rs.getTimestamp("due_date");
+                    Date due = (dueTs != null) ? new Date(dueTs.getTime()) : null;
+
+                    java.sql.Timestamp retTs = rs.getTimestamp("return_date");
+                    Date ret = (retTs != null) ? new Date(retTs.getTime()) : null;
+
+                    list.add(new BorrowRecord(rs.getLong("id"), book, borrow, due, ret)); // <-- đủ 5 tham số
                 }
             }
         }
@@ -62,69 +75,94 @@ public class UserDAO {
         }
     }
 
-    public void borrowBook(String userId, String isbn, LocalDate borrowDate) throws SQLException {
-        try (Connection conn = DatabaseManager.getConnection()) {
-            conn.setAutoCommit(false);
-            try {
-                // khóa & kiểm tra tồn
-                try (PreparedStatement check = conn.prepareStatement(
-                        "SELECT quantity FROM books WHERE isbn=? FOR UPDATE")) {
-                    check.setString(1, isbn);
-                    try (ResultSet rs = check.executeQuery()) {
-                        if (!rs.next()) throw new SQLException("Book not found: " + isbn);
-                        if (rs.getInt("quantity") <= 0) throw new SQLException("Out of stock for " + isbn);
-                    }
+    public void borrowBookByBookId(String userId, int bookId) throws SQLException {
+        try (Connection c = DatabaseManager.getConnection()) {
+            c.setAutoCommit(false);
+
+            // khóa tồn
+            try (PreparedStatement lock = c.prepareStatement(
+                    "SELECT quantity FROM books WHERE id=? FOR UPDATE")) {
+                lock.setInt(1, bookId);
+                try (ResultSet rs = lock.executeQuery()) {
+                    if (!rs.next()) throw new SQLException("Book not found");
+                    if (rs.getInt(1) < 1) throw new SQLException("Out of stock");
                 }
-                // ghi mượn
-                try (PreparedStatement ins = conn.prepareStatement(
-                        "INSERT INTO borrow_records(user_id,isbn,borrow_date) VALUES(?,?,?)")) {
-                    ins.setString(1, userId);
-                    ins.setString(2, isbn);
-                    ins.setDate(3, Date.valueOf(borrowDate));
-                    ins.executeUpdate();
-                }
-                // trừ tồn
-                try (PreparedStatement upd = conn.prepareStatement(
-                        "UPDATE books SET quantity = quantity - 1 WHERE isbn=?")) {
-                    upd.setString(1, isbn);
-                    upd.executeUpdate();
-                }
-                conn.commit();
-            } catch (SQLException ex) {
-                conn.rollback();
-                throw ex;
-            } finally {
-                conn.setAutoCommit(true);
             }
+
+            // ghi bản ghi mượn + hạn trả (nếu DB không hỗ trợ DEFAULT expr, luôn set ở đây)
+            try (PreparedStatement ins = c.prepareStatement("""
+                INSERT INTO borrow_records(user_id, book_id, due_date)
+                VALUES (?, ?, NOW() + INTERVAL 14 DAY)
+            """);
+                 PreparedStatement dec = c.prepareStatement(
+                         "UPDATE books SET quantity = quantity - 1 WHERE id=?")) {
+
+                ins.setString(1, userId);
+                ins.setInt(2, bookId);
+                ins.executeUpdate();
+
+                dec.setInt(1, bookId);
+                dec.executeUpdate();
+            }
+            c.commit();
         }
     }
 
-    public void returnBook(String userId, String isbn) throws SQLException {
-        try (Connection conn = DatabaseManager.getConnection()) {
-            conn.setAutoCommit(false);
-            try {
-                int deleted;
-                try (PreparedStatement del = conn.prepareStatement(
-                        "DELETE FROM borrow_records WHERE id=(" +
-                                " SELECT id FROM borrow_records WHERE user_id=? AND isbn=? " +
-                                " ORDER BY borrow_date DESC, id DESC LIMIT 1)")) {
-                    del.setString(1, userId);
-                    del.setString(2, isbn);
-                    deleted = del.executeUpdate();
-                }
-                if (deleted == 0) throw new SQLException("No borrow record to return.");
+    public void returnBookByBookId(String userId, int bookId) throws SQLException {
+        try (Connection c = DatabaseManager.getConnection()) {
+            c.setAutoCommit(false);
 
-                try (PreparedStatement upd = conn.prepareStatement(
-                        "UPDATE books SET quantity = quantity + 1 WHERE isbn=?")) {
-                    upd.setString(1, isbn);
-                    upd.executeUpdate();
+            // chỉ cập nhật bản ghi đang mở
+            int updated;
+            try (PreparedStatement up = c.prepareStatement("""
+            UPDATE borrow_records
+               SET return_date = NOW()
+             WHERE user_id = ? AND book_id = ? AND return_date IS NULL
+             ORDER BY borrow_date DESC
+             LIMIT 1
+        """)) {
+                up.setString(1, userId);
+                up.setInt(2, bookId);
+                updated = up.executeUpdate();
+            }
+            if (updated == 0) { c.rollback(); throw new SQLException("Already returned."); }
+
+            try (PreparedStatement inc = c.prepareStatement(
+                    "UPDATE books SET quantity = quantity + 1 WHERE id=?")) {
+                inc.setInt(1, bookId);
+                inc.executeUpdate();
+            }
+            c.commit();
+        }
+    }
+
+    public List<Book> listActiveBorrowedBooks(String userId) throws SQLException {
+        String sql = """
+        SELECT b.id AS book_id, b.isbn, b.title, b.authors, b.category, b.quantity, b.thumbnail_link,
+               br.borrow_date, br.due_date
+        FROM borrow_records br
+        JOIN books b ON b.id = br.book_id
+        WHERE br.user_id = ? AND br.return_date IS NULL
+        ORDER BY (NOW() > br.due_date) DESC, br.due_date ASC, br.borrow_date DESC
+    """;
+        try (Connection c = DatabaseManager.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<Book> list = new ArrayList<>();
+                while (rs.next()) {
+                    Book b = new Book(
+                            rs.getString("title"),
+                            rs.getString("authors"),
+                            rs.getString("category"),
+                            rs.getString("isbn"),
+                            rs.getInt("quantity"),
+                            rs.getString("thumbnail_link")
+                    );
+                    b.setId(String.valueOf(rs.getInt("book_id")));
+                    list.add(b);
                 }
-                conn.commit();
-            } catch (SQLException ex) {
-                conn.rollback();
-                throw ex;
-            } finally {
-                conn.setAutoCommit(true);
+                return list;
             }
         }
     }

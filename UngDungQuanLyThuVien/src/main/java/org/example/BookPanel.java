@@ -52,20 +52,14 @@ public class BookPanel extends JPanel {
         // === Nút Borrow (có thể ẩn) ===
         borrowButton = new JButton("Borrow");
         borrowButton.addActionListener(e -> {
-            Book borrowedBook = new Book(
-                    book.getTitle(),
-                    book.getAuthors(),
-                    book.getCategory(),
-                    book.getIsbn(),
-                    1,
-                    book.getThumbnailLink()
-            );
-
-            Library library = Library.getInstance();
             LibraryUser currentUser = Session.getCurrentUser();
-            if (currentUser != null) {
-                library.borrowBook(currentUser, borrowedBook);
-                JOptionPane.showMessageDialog(this, "You borrowed: " + book.getTitle());
+            if (currentUser instanceof User u) {
+                try {
+                    u.borrowBook(book, new UserDAO()); // DB trước, RAM sau
+                    JOptionPane.showMessageDialog(this, "You borrowed: " + book.getTitle());
+                } catch (RuntimeException ex) {
+                    JOptionPane.showMessageDialog(this, "Borrow failed: " + ex.getMessage());
+                }
             } else {
                 JOptionPane.showMessageDialog(this, "No user logged in");
             }
