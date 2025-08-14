@@ -31,29 +31,29 @@ public class AdminGUI extends JFrame {
 
         // ===== Bottom bar =====
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        JButton btnDisplay = new JButton("📚 DisplayDocument");
         JButton btnAddDoc  = new JButton("➕📄 Add Document");
         JButton btnAddUser = new JButton("➕👤 Add User");
         JButton btnBR      = new JButton("📝 DisplayBorrowRecords");
         JButton btnSearchG = new JButton("🔍📘 Search Google Books");
         JButton btnUInfo   = new JButton("👤ℹ️ Display User Info");
+        JButton btnChangePw = new JButton("🔑 Change Password");
         JButton btnLogout  = new JButton("🚪 Logout");
-        bottom.add(btnDisplay);
         bottom.add(btnAddDoc);
         bottom.add(btnAddUser);
         bottom.add(btnBR);
         bottom.add(btnSearchG);
         bottom.add(btnUInfo);
+        bottom.add(btnChangePw);
         bottom.add(btnLogout);
         add(bottom, BorderLayout.SOUTH);
 
         // Hành vi nút
-        btnDisplay.addActionListener(e -> showDisplayView());
         btnAddDoc.addActionListener(e -> addDocument());
         btnAddUser.addActionListener(e -> addUser());
         btnBR.addActionListener(e -> displayBorrowRecords());
         btnSearchG.addActionListener(e -> searchGoogleBooks());
-        btnUInfo.addActionListener(e -> displayUserInfo());
+        btnUInfo.addActionListener(e -> displayUserInfo(true));
+        btnChangePw.addActionListener(e -> changeAdminPassword());
         btnLogout.addActionListener(e -> doLogout());
 
         // Vào thẳng Display
@@ -243,20 +243,45 @@ public class AdminGUI extends JFrame {
     }
 
     private void addUser() {
-        String userId = JOptionPane.showInputDialog(this, "Enter user ID:");
-        String name = JOptionPane.showInputDialog(this, "Enter name:");
-        if (userId == null || userId.isBlank() || name == null || name.isBlank()) {
-            JOptionPane.showMessageDialog(this, "User ID and name cannot be empty."); return;
+        JTextField idF = new JTextField();
+        JTextField nameF = new JTextField();
+        JPasswordField pwF = new JPasswordField();
+        JComboBox<String> roleCmb = new JComboBox<>(new String[]{"USER","ADMIN"});
+
+        Object[] msg = {
+                "User ID:", idF,
+                "Name:", nameF,
+                "Initial Password:", pwF,
+                "Role:", roleCmb
+        };
+        int ok = JOptionPane.showConfirmDialog(this, msg, "Add User", JOptionPane.OK_CANCEL_OPTION);
+        if (ok != JOptionPane.OK_OPTION) return;
+
+        String uid = idF.getText().trim();
+        String name = nameF.getText().trim();
+        String role = String.valueOf(roleCmb.getSelectedItem());
+        String pw = new String(pwF.getPassword());
+
+        if (uid.isEmpty() || name.isEmpty() || pw.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "User ID / Name / Password cannot be empty.");
+            return;
         }
-        User user = new User(userId, name);
+
         try {
-            new UserDAO().insertUser(user);
-            library.addUser(user);
-            JOptionPane.showMessageDialog(this, "User added.");
+            // kiểm tra trùng
+            if (new UserDAO().getUserById(uid) != null) {
+                JOptionPane.showMessageDialog(this, "User already exists: " + uid);
+                return;
+            }
+            User u = new User(uid, name, role);
+            new UserDAO().insertUser(u, pw); // hash + salt
+            library.addUser(u);              // RAM
+            JOptionPane.showMessageDialog(this, "User added (" + role + ").");
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(this, "DB error: " + e.getMessage());
         }
     }
+
 
     private void searchGoogleBooks() {
         String keyword = JOptionPane.showInputDialog(this, "Enter keyword to search Google Books:");
@@ -378,25 +403,82 @@ public class AdminGUI extends JFrame {
         JOptionPane.showMessageDialog(this, scrollPane, "Borrow Records", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    private void displayUserInfo() {
-        LibraryUser user = Session.getCurrentUser();
-        if (user == null) {
-            JOptionPane.showMessageDialog(this, "No user logged in. (Main sẽ login sẵn để test)");
+    private void displayUserInfo(boolean onlyActive) {
+        List<UserBorrowStat> stats;
+        try {
+            stats = new UserDAO().getUserBorrowStats(onlyActive);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "DB error: " + e.getMessage());
             return;
         }
-        JOptionPane.showMessageDialog(this, user.toString());
+        if (stats == null || stats.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No users found.");
+            return;
+        }
+
+        String[] cols = {"#", "User ID", "Name", "Role", "Borrow Count"};
+        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+            @Override public Class<?> getColumnClass(int columnIndex) {
+                return columnIndex == 0 || columnIndex == 4 ? Integer.class : String.class;
+            }
+        };
+
+        int idx = 1;
+        for (UserBorrowStat s : stats) {
+            model.addRow(new Object[]{ idx++, s.userId, s.name, s.role, s.borrowCount });
+        }
+
+        JTable table = new JTable(model);
+        table.setAutoCreateRowSorter(true); // Cho phép người dùng tự sort lại nếu muốn
+
+        JScrollPane sp = new JScrollPane(table);
+        sp.setPreferredSize(new Dimension(700, 400));
+
+        // Hiển thị trong dialog hoặc gắn vào panel của AdminGUI
+        JOptionPane.showMessageDialog(this, sp,
+                onlyActive ? "Users (đang mượn)" : "Users (tổng số lượt mượn)",
+                JOptionPane.PLAIN_MESSAGE);
+    }
+
+
+    private void changeAdminPassword() {
+        if (!(Session.getCurrentUser() instanceof User u) || !u.isAdmin()) {
+            JOptionPane.showMessageDialog(this, "Please login as admin first.");
+            return;
+        }
+        JPasswordField oldF = new JPasswordField();
+        JPasswordField newF = new JPasswordField();
+        Object[] msg = {"Old password:", oldF, "New password:", newF};
+        int ret = JOptionPane.showConfirmDialog(this, msg, "Change Password (Admin)", JOptionPane.OK_CANCEL_OPTION);
+        if (ret != JOptionPane.OK_OPTION) return;
+
+        try {
+            boolean ok = new UserDAO().changePassword(u.getUserId(),
+                    new String(oldF.getPassword()),
+                    new String(newF.getPassword()));
+            JOptionPane.showMessageDialog(this, ok ? "Password updated." : "Wrong old password.");
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "DB error: " + ex.getMessage());
+        }
     }
 
     private void doLogout() {
-        if (Session.getCurrentUser() == null) {
+        var u = Session.getCurrentUser();
+        if (u == null) {
             JOptionPane.showMessageDialog(this, "No user logged in.");
             return;
         }
-        String name = Session.getCurrentUser().getName();
         Session.logout();
-        JOptionPane.showMessageDialog(this, "Logged out: " + name);
-        showDisplayView();
+        JOptionPane.showMessageDialog(this, "Logged out: " + u.getName());
+
+        // Mở lại màn hình login trên EDT
+        SwingUtilities.invokeLater(() -> new LibraryAppUI());
+
+        // Đóng cửa sổ hiện tại
+        dispose();
     }
+
     private java.util.List<Book> getAllBooksFromRAM() {
         java.util.List<Book> list = new java.util.ArrayList<>();
         for (LibraryItem li : library.getItems()) if (li instanceof Book b) list.add(b);
@@ -407,4 +489,6 @@ public class AdminGUI extends JFrame {
         try { return new BookDAO().getBorrowCountsMap(); }
         catch (java.sql.SQLException e) { return java.util.Collections.emptyMap(); }
     }
+
+
 }

@@ -6,15 +6,27 @@ public class User implements LibraryUser {
     private String userId;
     private String name;
     private final List<BorrowRecord> borrowRecord = new ArrayList<>();
-
+    private String role;
     public User(String userId, String name) { this.userId = userId; this.name = name; }
-
+    public User(String userId, String name, String role) {
+        this.userId = userId;
+        this.name = name;
+        this.role = (role == null || role.isBlank()) ? "USER" : role.toUpperCase();
+    }
     @Override public String getUserId() { return userId; }
     @Override public void setUserId(String userId) { this.userId = userId; }
     @Override public String getName() { return name; }
     @Override public void setName(String name) { this.name = name; }
     @Override public List<BorrowRecord> getBorrowRecord() { return borrowRecord; }
-
+    public String getRole() {
+        return role;
+    }
+    public void setRole(String role) {
+        this.role = (role == null || role.isBlank()) ? "USER" : role.toUpperCase();
+    }
+    public boolean isAdmin() {
+        return "ADMIN".equalsIgnoreCase(role);
+    }
     @Override
     public List<LibraryItem> getBorrowedItems() {
         List<LibraryItem> items = new ArrayList<>();

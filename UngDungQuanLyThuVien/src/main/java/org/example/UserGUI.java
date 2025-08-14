@@ -193,16 +193,21 @@ public class UserGUI extends JFrame {
     }
 
     private void doLogout() {
-        if (Session.getCurrentUser() == null) {
+        var u = Session.getCurrentUser();
+        if (u == null) {
             JOptionPane.showMessageDialog(this, "No user logged in.");
             return;
         }
-        String name = Session.getCurrentUser().getName();
         Session.logout();
-        JOptionPane.showMessageDialog(this, "Logged out: " + name);
-        // Render lại Display (Borrow sẽ tự chặn vì BookPanel kiểm tra Session)
-        showDisplayView();
+        JOptionPane.showMessageDialog(this, "Logged out: " + u.getName());
+
+        // Mở lại màn hình login trên EDT
+        SwingUtilities.invokeLater(() -> new LibraryAppUI());
+
+        // Đóng cửa sổ hiện tại
+        dispose();
     }
+
 
     /* =================== RENDER HELPERS =================== */
 

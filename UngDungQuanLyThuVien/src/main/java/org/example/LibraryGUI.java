@@ -1,4 +1,4 @@
-package org.example;
+/**package org.example;
 
 import javax.swing.*;
 import java.awt.*;
@@ -804,4 +804,4 @@ public class LibraryGUI {
         JOptionPane.showMessageDialog(null, scrollPane, "Borrow Records", JOptionPane.INFORMATION_MESSAGE);
     }
 
-}
+}*/
