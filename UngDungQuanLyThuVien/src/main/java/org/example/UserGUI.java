@@ -33,12 +33,12 @@ public class UserGUI extends JFrame {
 
         // ==== thanh nút dưới cùng ====
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        JButton btnDisplay = new JButton("📚 DisplayDocument");   // mới: luôn có để quay lại trang đầu
+        JButton btnDisplay = new JButton("📚 DisplayDocument");   // luôn có để quay lại trang đầu
         JButton btnChange  = new JButton("🔑 ChangePassword");
         JButton btnReturn  = new JButton("🔙 ReturnDocument");
         JButton btnSuggest = new JButton("✨ Gợi ý");
         JButton btnRecent  = new JButton("🕓 Vừa đọc");
-        JButton btnLogout  = new JButton("🚪 Logout");            // mới: logout tạm thời
+        JButton btnLogout  = new JButton("🚪 Logout");
         bottom.add(btnDisplay);
         bottom.add(btnChange);
         bottom.add(btnReturn);
@@ -52,7 +52,7 @@ public class UserGUI extends JFrame {
         btnChange.addActionListener(e -> changePassword());
         btnReturn.addActionListener(e -> new LibraryGUI_Shared(library).returnDocument());
         btnSuggest.addActionListener(e -> showSuggestView());
-        btnRecent.addActionListener(e -> showRecentView());   // sẽ lấy 10 cuốn gần nhất
+        btnRecent.addActionListener(e -> showRecentView());   // lấy 10 cuốn gần nhất
         btnLogout.addActionListener(e -> doLogout());
 
         // mở app vào thẳng Display
@@ -80,9 +80,25 @@ public class UserGUI extends JFrame {
         topBar.setBackground(Color.WHITE);
         final JTextField searchField = new JTextField();
         final JButton searchBtn = new JButton("Search");
-        final JButton clearBtn  = new JButton("Clear");
+
+        // ===== Thay nút Clear bằng combo 'thể loại nhanh' (điền chuỗi vào ô search) =====
+        final String[] quickTerms = new String[]{
+                "ALL",
+                "NOVEL","HISTORY","SCIENCE","MATHEMATICS","ENGINEERING","COMPUTER","PROGRAMMING","JAVA","DATABASE","ART",
+                "ECONOMICS","BUSINESS","MANAGEMENT","PHILOSOPHY","PSYCHOLOGY","EDUCATION","CHILDREN","FANTASY","MYSTERY",
+                "MACHINE LEARNING","DATA SCIENCE","CHEMISTRY","PHYSICS","BIOLOGY","MEDICINE","LAW","POLITICS",
+                "CULTURE","MUSIC","DESIGN","ARCHITECTURE","PHOTOGRAPHY","TRAVEL","COOKING","HEALTH","SPORT",
+                "POETRY","DRAMA","LITERATURE","ENVIRONMENT","ASTRONOMY","GEOGRAPHY","ANTHROPOLOGY","MYTHOLOGY","RELIGION",
+                "SELF HELP","PRODUCTIVITY","STARTUPS","MARKETING","FINANCE","INVESTMENT","NETWORKING"
+        };
+        final JComboBox<String> categoryBox = new JComboBox<>(quickTerms);
+        // categoryBox.setEditable(true); // nếu muốn cho gõ thêm trong combo
+
         JPanel rightTop = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        rightTop.setOpaque(false); rightTop.add(searchBtn); rightTop.add(clearBtn);
+        rightTop.setOpaque(false);
+        rightTop.add(categoryBox);
+        rightTop.add(searchBtn);
+
         topBar.add(new JLabel("Search:"), BorderLayout.WEST);
         topBar.add(searchField, BorderLayout.CENTER);
         topBar.add(rightTop, BorderLayout.EAST);
@@ -111,7 +127,24 @@ public class UserGUI extends JFrame {
         doSearchRef[0] = doSearch;
         searchBtn.addActionListener(ev -> doSearch.run());
         searchField.addActionListener(ev -> doSearch.run());
-        clearBtn.addActionListener(ev -> { searchField.setText(""); doSearch.run(); });
+
+        // Khi đổi mục trong combo: điền vào ô search rồi tìm luôn
+        categoryBox.addActionListener(ev -> {
+            String sel = String.valueOf(categoryBox.getSelectedItem());
+            if ("All".equalsIgnoreCase(sel)) searchField.setText("");
+            else searchField.setText(sel);
+            doSearch.run();
+            searchField.requestFocusInWindow();
+        });
+
+        // (tuỳ chọn) ESC để xoá nhanh ô search (không ảnh hưởng combo)
+        javax.swing.KeyStroke esc = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0);
+        searchField.getInputMap(JComponent.WHEN_FOCUSED).put(esc, "clearSearch");
+        searchField.getActionMap().put("clearSearch", new AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) {
+                if (!searchField.getText().isEmpty()) searchField.setText("");
+            }
+        });
 
         // gắn vào root
         centerRoot.add(topBar, BorderLayout.NORTH);
@@ -144,7 +177,7 @@ public class UserGUI extends JFrame {
         scrollToTop(scroll);
     }
 
-    /* ============ VIEW 3: Vừa đọc (cuộn BookPanel, TOP 10 gần nhất) ============ */
+    /* ============ VIEW 3: Vừa đọc (TOP 10 gần nhất) ============ */
     private void showRecentView() {
         centerRoot.removeAll();
 
@@ -208,7 +241,6 @@ public class UserGUI extends JFrame {
         dispose();
     }
 
-
     /* =================== RENDER HELPERS =================== */
 
     private JPanel makeListPanel() {
@@ -258,9 +290,14 @@ public class UserGUI extends JFrame {
             card.add(bookPanel, BorderLayout.CENTER);
 
             try {
-                String qrContent = (b.getId() != null && !b.getId().isBlank()) ? ("BOOK_ID:" + b.getId())
-                        : (b.getIsbn() != null && !b.getIsbn().isBlank() && !"N/A".equalsIgnoreCase(b.getIsbn())) ? ("ISBN:" + b.getIsbn())
-                        : b.toString();
+                String qrContent;
+                if (b.getTitle() != null && !b.getTitle().isBlank()) {
+                    qrContent = "https://www.google.com/search?q="
+                            + java.net.URLEncoder.encode(b.getTitle(), java.nio.charset.StandardCharsets.UTF_8)
+                            + "+site:books.google.com";
+                } else {
+                    qrContent = "https://books.google.com"; // fallback nếu không có title
+                }
                 BufferedImage qr = QRCodeGenerator.generateQRCodeImage(qrContent, 120, 120);
                 JLabel qrLabel = new JLabel(new ImageIcon(qr));
                 qrLabel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
@@ -283,3 +320,4 @@ public class UserGUI extends JFrame {
                 : this.userId;
     }
 }
+

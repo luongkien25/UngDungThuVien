@@ -1,19 +1,11 @@
 package org.example;
 
 import javax.swing.*;
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Point;
-import java.awt.image.BufferedImage;
 import javax.swing.table.DefaultTableModel;
-import java.sql.SQLException;
-import java.util.ArrayList;
+import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Collections;
 
 public class AdminGUI extends JFrame {
     private final Library library = Library.getInstance();
@@ -31,13 +23,13 @@ public class AdminGUI extends JFrame {
 
         // ===== Bottom bar =====
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        JButton btnAddDoc  = new JButton("➕📄 Add Document");
-        JButton btnAddUser = new JButton("➕👤 Add User");
-        JButton btnBR      = new JButton("📝 DisplayBorrowRecords");
-        JButton btnSearchG = new JButton("🔍📘 Search Google Books");
-        JButton btnUInfo   = new JButton("👤ℹ️ Display User Info");
+        JButton btnAddDoc   = new JButton("➕📄 Add Document");
+        JButton btnAddUser  = new JButton("➕👤 Add User");
+        JButton btnBR       = new JButton("📝 DisplayBorrowRecords");
+        JButton btnSearchG  = new JButton("🔍📘 Search Google Books");
+        JButton btnUInfo    = new JButton("👤ℹ️ Display User Info");
         JButton btnChangePw = new JButton("🔑 Change Password");
-        JButton btnLogout  = new JButton("🚪 Logout");
+        JButton btnLogout   = new JButton("🚪 Logout");
         bottom.add(btnAddDoc);
         bottom.add(btnAddUser);
         bottom.add(btnBR);
@@ -86,11 +78,24 @@ public class AdminGUI extends JFrame {
         searchField.setToolTipText("Type your query, then press Search or Enter.");
 
         final JButton searchBtn = new JButton("Search");
-        final JButton clearBtn  = new JButton("Clear");
+
+        // ===== Thay nút Clear bằng combo “thể loại nhanh” (điền chuỗi vào ô Search) =====
+        final String[] quickTerms = new String[]{
+                "ALL",
+                "NOVEL","HISTORY","SCIENCE","MATHEMATICS","ENGINEERING","COMPUTER","PROGRAMMING","JAVA","DATABASE","ART",
+                "ECONOMICS","BUSINESS","MANAGEMENT","PHILOSOPHY","PSYCHOLOGY","EDUCATION","CHILDREN","FANTASY","MYSTERY",
+                "MACHINE LEARNING","DATA SCIENCE","CHEMISTRY","PHYSICS","BIOLOGY","MEDICINE","LAW","POLITICS",
+                "CULTURE","MUSIC","DESIGN","ARCHITECTURE","PHOTOGRAPHY","TRAVEL","COOKING","HEALTH","SPORT",
+                "POETRY","DRAMA","LITERATURE","ENVIRONMENT","ASTRONOMY","GEOGRAPHY","ANTHROPOLOGY","MYTHOLOGY","RELIGION",
+                "SELF HELP","PRODUCTIVITY","STARTUPS","MARKETING","FINANCE","INVESTMENT","NETWORKING"
+        };
+        final JComboBox<String> categoryBox = new JComboBox<>(quickTerms);
+        // categoryBox.setEditable(true); // nếu muốn cho gõ thêm ngay trong combo
+
         final JPanel rightTop = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         rightTop.setOpaque(false);
+        rightTop.add(categoryBox);
         rightTop.add(searchBtn);
-        rightTop.add(clearBtn);
 
         topBar.add(new JLabel("Search:"), BorderLayout.WEST);
         topBar.add(searchField, BorderLayout.CENTER);
@@ -119,9 +124,20 @@ public class AdminGUI extends JFrame {
         // render lần đầu
         doSearch.run();
 
-        // bind nút/enter/clear
+        // bind nút/enter
         searchBtn.addActionListener(ev -> doSearch.run());
         searchField.addActionListener(ev -> doSearch.run());
+
+        // Khi đổi mục trong combo: điền vào ô search rồi search luôn
+        categoryBox.addActionListener(ev -> {
+            String sel = String.valueOf(categoryBox.getSelectedItem());
+            if ("All".equalsIgnoreCase(sel)) searchField.setText("");
+            else searchField.setText(sel);
+            doSearch.run();
+            searchField.requestFocusInWindow();
+        });
+
+        // (tuỳ chọn) ESC để xoá nhanh ô search
         javax.swing.KeyStroke esc = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0);
         searchField.getInputMap(JComponent.WHEN_FOCUSED).put(esc, "clearSearch");
         searchField.getActionMap().put("clearSearch", new AbstractAction() {
@@ -129,7 +145,6 @@ public class AdminGUI extends JFrame {
                 if (!searchField.getText().isEmpty()) searchField.setText("");
             }
         });
-        clearBtn.addActionListener(ev -> { if (!searchField.getText().isEmpty()) searchField.setText(""); doSearch.run(); });
 
         centerRoot.add(topBar, BorderLayout.NORTH);
         centerRoot.add(scrollPane, BorderLayout.CENTER);
@@ -178,11 +193,15 @@ public class AdminGUI extends JFrame {
 
             card.add(bookPanel, BorderLayout.CENTER);
 
-            // QR giống các view khác (KHÔNG dùng b.toString() để tránh NPE)
             try {
-                String qrContent = (b.getId() != null && !b.getId().isBlank()) ? ("BOOK_ID:" + b.getId())
-                        : (b.getIsbn() != null && !b.getIsbn().isBlank() && !"N/A".equalsIgnoreCase(b.getIsbn())) ? ("ISBN:" + b.getIsbn())
-                        : (b.getTitle() != null ? b.getTitle() : "BOOK");
+                String qrContent;
+                if (b.getTitle() != null && !b.getTitle().isBlank()) {
+                    qrContent = "https://www.google.com/search?q="
+                            + java.net.URLEncoder.encode(b.getTitle(), java.nio.charset.StandardCharsets.UTF_8)
+                            + "+site:books.google.com";
+                } else {
+                    qrContent = "https://books.google.com"; // fallback nếu không có title
+                }
 
                 BufferedImage qr = QRCodeGenerator.generateQRCodeImage(qrContent, 120, 120);
                 JLabel qrLabel = new JLabel(new ImageIcon(qr));
@@ -207,7 +226,7 @@ public class AdminGUI extends JFrame {
         });
     }
 
-    /* ================== HÀNH VI NÚT KHÁC (giữ y như bản bạn gửi) ================== */
+    /* ================== HÀNH VI NÚT KHÁC (giữ y như bản trước) ================== */
 
     private void addDocument() {
         String title = JOptionPane.showInputDialog(this, "Enter title:");
@@ -237,7 +256,7 @@ public class AdminGUI extends JFrame {
             library.addItem(book);          // RAM (đúng instance)
             JOptionPane.showMessageDialog(this, "Document added.");
             showDisplayView();              // refresh
-        } catch (SQLException e) {
+        } catch (java.sql.SQLException e) {
             JOptionPane.showMessageDialog(this, "DB error: " + e.getMessage());
         }
     }
@@ -268,7 +287,6 @@ public class AdminGUI extends JFrame {
         }
 
         try {
-            // kiểm tra trùng
             if (new UserDAO().getUserById(uid) != null) {
                 JOptionPane.showMessageDialog(this, "User already exists: " + uid);
                 return;
@@ -277,11 +295,10 @@ public class AdminGUI extends JFrame {
             new UserDAO().insertUser(u, pw); // hash + salt
             library.addUser(u);              // RAM
             JOptionPane.showMessageDialog(this, "User added (" + role + ").");
-        } catch (SQLException e) {
+        } catch (java.sql.SQLException e) {
             JOptionPane.showMessageDialog(this, "DB error: " + e.getMessage());
         }
     }
-
 
     private void searchGoogleBooks() {
         String keyword = JOptionPane.showInputDialog(this, "Enter keyword to search Google Books:");
@@ -332,7 +349,7 @@ public class AdminGUI extends JFrame {
                             JOptionPane.showMessageDialog(this, "Book added to library. (ID: " + book.getId() + ", Qty: " + book.getQuantity() + ")");
                         }
                         showDisplayView(); // refresh
-                    } catch (SQLException ex) {
+                    } catch (java.sql.SQLException ex) {
                         JOptionPane.showMessageDialog(this, "DB error: " + ex.getMessage());
                     }
                 });
@@ -344,6 +361,11 @@ public class AdminGUI extends JFrame {
 
             JScrollPane scrollPane = new JScrollPane(resultPanel);
             scrollPane.setPreferredSize(new Dimension(700, 640));
+
+            SwingUtilities.invokeLater(() -> {
+                scrollPane.getViewport().setViewPosition(new Point(0, 0));
+                scrollPane.getVerticalScrollBar().setValue(0);
+            });
 
             JDialog dialog = new JDialog(this, "Search Results", true);
             dialog.getContentPane().add(scrollPane);
@@ -430,17 +452,15 @@ public class AdminGUI extends JFrame {
         }
 
         JTable table = new JTable(model);
-        table.setAutoCreateRowSorter(true); // Cho phép người dùng tự sort lại nếu muốn
+        table.setAutoCreateRowSorter(true);
 
         JScrollPane sp = new JScrollPane(table);
         sp.setPreferredSize(new Dimension(700, 400));
 
-        // Hiển thị trong dialog hoặc gắn vào panel của AdminGUI
         JOptionPane.showMessageDialog(this, sp,
                 onlyActive ? "Users (đang mượn)" : "Users (tổng số lượt mượn)",
                 JOptionPane.PLAIN_MESSAGE);
     }
-
 
     private void changeAdminPassword() {
         if (!(Session.getCurrentUser() instanceof User u) || !u.isAdmin()) {
@@ -458,7 +478,7 @@ public class AdminGUI extends JFrame {
                     new String(oldF.getPassword()),
                     new String(newF.getPassword()));
             JOptionPane.showMessageDialog(this, ok ? "Password updated." : "Wrong old password.");
-        } catch (SQLException ex) {
+        } catch (java.sql.SQLException ex) {
             JOptionPane.showMessageDialog(this, "DB error: " + ex.getMessage());
         }
     }
@@ -471,11 +491,7 @@ public class AdminGUI extends JFrame {
         }
         Session.logout();
         JOptionPane.showMessageDialog(this, "Logged out: " + u.getName());
-
-        // Mở lại màn hình login trên EDT
         SwingUtilities.invokeLater(() -> new LibraryAppUI());
-
-        // Đóng cửa sổ hiện tại
         dispose();
     }
 
@@ -489,6 +505,4 @@ public class AdminGUI extends JFrame {
         try { return new BookDAO().getBorrowCountsMap(); }
         catch (java.sql.SQLException e) { return java.util.Collections.emptyMap(); }
     }
-
-
 }

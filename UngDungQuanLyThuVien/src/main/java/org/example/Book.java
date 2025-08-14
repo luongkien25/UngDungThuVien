@@ -34,6 +34,7 @@ public class Book implements LibraryItem {
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getAuthors() { return authors; }
+    public void setAuthors(String authors) { this.authors = authors; }
     public String getCategory() { return category; }
     public void setDescription(String description) {}
     public String getIsbn() { return isbn; }

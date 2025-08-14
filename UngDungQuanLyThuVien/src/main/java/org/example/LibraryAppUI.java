@@ -18,35 +18,77 @@ public class LibraryAppUI {
 
         frame = new JFrame("📚 Library Launcher");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(420, 260);
+        frame.setSize(500, 350);
         frame.setLocationRelativeTo(null);
 
-        JPanel root = new JPanel();
-        root.setLayout(new BoxLayout(root, BoxLayout.Y_AXIS));
-        root.setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(BorderFactory.createEmptyBorder(50, 40, 50, 40));
+        panel.setBackground(new java.awt.Color(240, 248, 255)); // cùng màu với trường hợp 1
 
         JLabel title = new JLabel("Welcome to the Library System", SwingConstants.CENTER);
+        title.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 25));
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
-        title.setFont(title.getFont().deriveFont(18f));
-        title.setBorder(BorderFactory.createEmptyBorder(0, 0, 16, 0));
+        title.setForeground(new java.awt.Color(33, 66, 99));
 
-        JButton btnAdmin = new JButton("🔐 Login as Admin");
-        JButton btnUser  = new JButton("👤 Login as User");
-        for (JButton b : new JButton[]{btnAdmin, btnUser}) {
-            b.setAlignmentX(Component.CENTER_ALIGNMENT);
-            b.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
-            b.setFocusPainted(false);
-        }
+        JButton btnAdmin = new JButton("Admin");
+        JButton btnUser  = new JButton("User");
 
+        btnAdmin.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btnUser.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        java.awt.Font btnFont = new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 20);
+        btnAdmin.setFont(btnFont);
+        btnUser.setFont(btnFont);
+
+// Kích thước nút
+        btnAdmin.setMaximumSize(new Dimension(Integer.MAX_VALUE, 55));
+        btnUser.setMaximumSize(new Dimension(Integer.MAX_VALUE, 55));
+
+// Màu nền + style giống trường hợp 1
+        btnAdmin.setBackground(new java.awt.Color(70, 130, 180));
+        btnAdmin.setForeground(java.awt.Color.WHITE);
+        btnAdmin.setFocusPainted(false);
+        btnAdmin.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        btnUser.setBackground(new java.awt.Color(34, 139, 34));
+        btnUser.setForeground(java.awt.Color.WHITE);
+        btnUser.setFocusPainted(false);
+        btnUser.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+// Hover effect đồng nhất
+        btnAdmin.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                btnAdmin.setBackground(new java.awt.Color(60, 110, 160));
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                btnAdmin.setBackground(new java.awt.Color(70, 130, 180));
+            }
+        });
+        btnUser.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                btnUser.setBackground(new java.awt.Color(24, 119, 24));
+            }
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                btnUser.setBackground(new java.awt.Color(34, 139, 34));
+            }
+        });
+
+// Gắn action như cũ
         btnAdmin.addActionListener(e -> loginAdminAndLaunch());
         btnUser.addActionListener(e -> loginUserAndLaunch());
 
-        root.add(title);
-        root.add(btnAdmin);
-        root.add(Box.createVerticalStrut(12));
-        root.add(btnUser);
+// Lắp vào panel
+        panel.add(Box.createVerticalGlue());
+        panel.add(title);
+        panel.add(Box.createRigidArea(new Dimension(0, 40)));
+        panel.add(btnAdmin);
+        panel.add(Box.createRigidArea(new Dimension(0, 20)));
+        panel.add(btnUser);
+        panel.add(Box.createVerticalGlue());
 
-        frame.setContentPane(root);
+// Đặt vào frame
+        frame.setContentPane(panel);
         frame.setVisible(true);
     }
 

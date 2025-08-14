@@ -1,10 +1,7 @@
 package org.example;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
-import java.io.IOException;
-import java.net.URL;
 
 public class BookPanel extends JPanel {
     private final Book book;
@@ -29,28 +26,26 @@ public class BookPanel extends JPanel {
         setBorder(BorderFactory.createLineBorder(Color.GRAY, 1));
         setBackground(Color.WHITE);
 
-        // === Ảnh sách ===
+        // === Ảnh sách (bất đồng bộ + cache) ===
         JLabel imageLabel = new JLabel();
-        imageLabel.setPreferredSize(new Dimension(100, 150));
+        imageLabel.setName("cover");
+        imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        imageLabel.setVerticalAlignment(SwingConstants.CENTER);
+        imageLabel.setPreferredSize(new Dimension(136, 200));
+        imageLabel.setMinimumSize(new Dimension(136, 200));
+        imageLabel.setOpaque(true);
+        imageLabel.setBackground(Color.WHITE);
 
-        String imageUrl = book.getThumbnailLink();
-        if (imageUrl != null && !imageUrl.isEmpty() && !"N/A".equalsIgnoreCase(imageUrl)) {
-            try {
-                Image image = ImageIO.read(new URL(imageUrl));
-                Image scaledImage = image.getScaledInstance(100, 150, Image.SCALE_SMOOTH);
-                imageLabel.setIcon(new ImageIcon(scaledImage));
-            } catch (IOException e) {
-                System.err.println("Could not load image: " + imageUrl);
-                imageLabel.setText("No Image");
-            }
-        } else {
-            imageLabel.setText("No Image");
-        }
+        // Lấy placeholder ngay và đăng ký callback khi tải xong (đúng API: gọi qua getInstance())
+        ImageIcon ph = ImageCache.getInstance().getIconAsync(
+                book.getIsbn(), book.getThumbnailLink(), 200, imageLabel
+        );
+        imageLabel.setIcon(ph);
 
-        // === Thông tin sách (build an toàn, không dùng toString()) ===
-        String title = book.getTitle() != null ? book.getTitle() : "(No title)";
+        // === Thông tin sách ===
+        String title   = book.getTitle()   != null ? book.getTitle()   : "(No title)";
         String authors = book.getAuthors() != null ? book.getAuthors() : "(Unknown)";
-        String cat = book.getCategory() != null ? book.getCategory() : "";
+        String cat     = book.getCategory()!= null ? book.getCategory(): "";
         String isbnTxt = (book.getIsbn() == null || book.getIsbn().isBlank() || "N/A".equalsIgnoreCase(book.getIsbn()))
                 ? "N/A" : book.getIsbn();
         String info = title + " by " + authors +
@@ -140,7 +135,7 @@ public class BookPanel extends JPanel {
 
                     // cập nhật object trong RAM
                     book.setTitle(newTitle);
-                    book.setDescription(newAuthors);
+                    book.setAuthors(newAuthors);
                     book.setQuantity(newQty);
                     book.setCategory(newCategory);
 
