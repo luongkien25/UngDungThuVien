@@ -14,45 +14,71 @@
 
 # 
 
-# \- \*\*Quản lý sách\*\*
+# \### 📖 Quản lý sách
 
-# &nbsp; - Thêm, sửa, xóa sách
+# \- Thêm, sửa, xóa sách
 
-# &nbsp; - Cập nhật số lượng, thống kê số lượt mượn
+# \- Cập nhật số lượng
 
-# &nbsp; - Tìm kiếm theo tiêu đề, tác giả, ISBN, thể loại
+# \- Hiển thị chi tiết sách kèm ảnh bìa
 
-# &nbsp; - Hỗ trợ tải thông tin sách từ Google Books API
+# \- Thống kê số lượt mượn cho từng sách
 
-# 
+# \- Tìm kiếm theo \*\*tiêu đề, tác giả, ISBN, thể loại\*\*
 
-# \- \*\*Quản lý người dùng\*\*
-
-# &nbsp; - Đăng nhập / Đăng ký (User)
-
-# &nbsp; - Quản trị viên (Admin) với phân quyền
-
-# &nbsp; - Đổi mật khẩu (có mã hóa password)
-
-# &nbsp; - Thống kê số lượt mượn của từng user
+# \- Hỗ trợ tải thông tin sách từ \*\*Google Books API\*\*
 
 # 
 
-# \- \*\*Mượn – trả sách\*\*
+# \### 👤 Quản lý người dùng
 
-# &nbsp; - Mỗi người dùng được mượn tối đa 3 cuốn cùng lúc
+# \- Đăng ký / Đăng nhập (User)
 
-# &nbsp; - Ghi nhận lịch sử mượn – trả
+# \- Quản trị viên (Admin) với phân quyền riêng
 
-# &nbsp; - Hiển thị sách đã mượn và gợi ý sách theo sở thích
+# \- Hash mật khẩu trong database
+
+# \- Đổi mật khẩu cho cả Admin và User
+
+# \- Thống kê số lượt mượn sách của từng user
+
+# \- Giới hạn số lượt mượn cùng lúc (tối đa \*\*3 cuốn\*\*)
+
+# 
+
+# \### 🔄 Mượn – trả sách
+
+# \- Ghi nhận lịch sử mượn – trả
+
+# \- Hiển thị danh sách sách đã mượn
+
+# \- Quản lý số lượng sách đang mượn
+
+# \- Không cho phép mượn thêm khi đã đủ 3 cuốn
+
+# 
+
+# \### 💡 Tính năng nâng cao
+
+# \- Gợi ý sách dựa trên \*\*thể loại yêu thích\*\* của người dùng
+
+# \- Hiển thị sách vừa đọc gần nhất
+
+# \- Cache ảnh để tăng tốc hiển thị danh sách
+
+# \- Giao diện riêng:
+
+# &nbsp; - \*\*AdminGUI\*\*: Quản lý sách, người dùng, thống kê
+
+# &nbsp; - \*\*UserGUI\*\*: Mượn – trả, gợi ý sách, đổi mật khẩu, xem lịch sử
+
+# 
 
 # ---
 
 # 
 
 # \## 🛠 Yêu cầu hệ thống
-
-# 
 
 # \- \*\*Java JDK\*\* 17 trở lên  
 
@@ -68,31 +94,17 @@
 
 # \## ⚙️ Cài đặt \& chạy chương trình
 
-# 
+# 1\. Clone project: https://github.com/luongkien25/UngDungThuVien.git
 
-# 1\. Clone project:
+# Cấu hình cơ sở dữ liệu trong DatabaseManager.java
 
-# &nbsp;  ```bash
-
-# &nbsp;  git clone https://github.com/your-username/library-system.git
-
-&nbsp;  cd library-system
-2. Cấu hình cơ sở dữ liệu trong DatabaseManager.java:
-===
-
-# &nbsp;  private static final String URL =       "jdbc:mysql://localhost:3306/library\_db";
-
-# &nbsp;  private static final String USER = "root";
-
-# &nbsp;  private static final String PASS = "1234";
-
-3\. Lấy csdl trong file Dump20250818.sql
-## 🔑 Tài khoản mặc định
-===
+# Import cơ sở dữ liệu từ file Dump20250818.sql
 
 # 
 
-# Admin:
+# 🔑 Tài khoản mặc định
+
+# Admin
 
 # 
 
@@ -104,7 +116,9 @@
 
 # 
 
-# User: có thể đăng ký mới ngay trên giao diện.
+# User
 
+# 
 
+# Có thể đăng ký mới ngay trên giao diện.
 
