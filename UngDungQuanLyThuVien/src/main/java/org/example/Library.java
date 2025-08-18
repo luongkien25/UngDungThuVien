@@ -218,7 +218,6 @@ public class Library {
         return out;
     }
 
-    // =============== Scoring ===============
     private double scoreBookForQuery(Book b, String normQuery, List<String> qTokens) {
         ensureBookCache(b);
         String nt = b.getNormTitle();
@@ -270,7 +269,6 @@ public class Library {
         return score;
     }
 
-    // ===================== Index build/update =====================
 
     private void rebuildIndexes() {
         idxTitle.clear(); idxAuthor.clear(); idxCategory.clear();

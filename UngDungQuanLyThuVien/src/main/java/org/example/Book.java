@@ -9,7 +9,6 @@ public class Book implements LibraryItem {
     private String thumbnailLink;
     private String id;
 
-    // ===== Cache phục vụ tìm kiếm (điền khi load) =====
     private String normTitle;
     private String normAuthors;
     private String normCategory;
@@ -27,7 +26,6 @@ public class Book implements LibraryItem {
         this.thumbnailLink = thumbnailLink;
     }
 
-    // ====== getters/setters cơ bản ======
     public String getThumbnailLink() { return thumbnailLink; }
     public void setThumbnailLink(String thumbnailLink) { this.thumbnailLink = thumbnailLink;}
     public String getDescription() { return authors + " - " + category; }
@@ -56,7 +54,6 @@ public class Book implements LibraryItem {
     @Override public String getId() { return id; }
     @Override public void setId(String id) { this.id = id; }
 
-    // ====== equals ======
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

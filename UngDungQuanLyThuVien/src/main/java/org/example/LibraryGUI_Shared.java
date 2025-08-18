@@ -9,7 +9,6 @@ public class LibraryGUI_Shared {
     private final Library library;
     public LibraryGUI_Shared(Library lib) { this.library = lib; }
 
-    /** Bản dùng chung của hàm returnDocument (copy từ LibraryGUI của bạn) */
     public void returnDocument() {
         LibraryUser lu = Session.getCurrentUser();
         if (lu == null) {

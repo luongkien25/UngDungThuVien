@@ -39,7 +39,6 @@ public class BookDAO {
             conn.setAutoCommit(false);
             try {
                 if (isbnParam != null) {
-                    // UPSERT theo ISBN (UNIQUE)
                     String sql = """
                     INSERT INTO books (isbn, title, authors, category, quantity, thumbnail_link)
                     VALUES (?, ?, ?, ?, ?, ?)
@@ -67,7 +66,6 @@ public class BookDAO {
                         }
                     }
 
-                    // Dù insert hay update, lấy id + quantity hiện tại để đồng bộ RAM
                     try (PreparedStatement ps = conn.prepareStatement(
                             "SELECT id, quantity FROM books WHERE isbn = ?")) {
                         ps.setString(1, isbnParam);
@@ -79,7 +77,6 @@ public class BookDAO {
                         }
                     }
                 } else {
-                    // KHÔNG CÓ ISBN: thử khớp theo title + authors + category
                     String selectSql = """
                     SELECT id, quantity FROM books
                      WHERE isbn IS NULL
@@ -169,71 +166,7 @@ public class BookDAO {
             if (rows == 0) throw new SQLException("No book updated. ISBN not found: " + isbn);
         }
     }
-    public java.util.List<java.util.Map<String,Object>> getBooksWithBorrowCount() throws SQLException {
-        String sql = """
-        SELECT b.id, b.isbn, b.title, b.authors, b.category, b.quantity,
-               COUNT(br.id) AS borrow_count
-        FROM books b
-        LEFT JOIN borrow_records br ON br.book_id = b.id
-        GROUP BY b.id
-        ORDER BY borrow_count DESC, b.title
-    """;
-        try (Connection c = DatabaseManager.getConnection();
-             PreparedStatement ps = c.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            java.util.List<java.util.Map<String,Object>> out = new java.util.ArrayList<>();
-            while (rs.next()) {
-                java.util.Map<String,Object> row = new java.util.LinkedHashMap<>();
-                row.put("id", rs.getInt("id"));
-                row.put("isbn", rs.getString("isbn"));
-                row.put("title", rs.getString("title"));
-                row.put("authors", rs.getString("authors"));
-                row.put("category", rs.getString("category"));
-                row.put("quantity", rs.getInt("quantity"));
-                row.put("borrow_count", rs.getLong("borrow_count"));
-                out.add(row);
-            }
-            return out;
-        }
-    }
 
-    public java.util.List<java.util.Map<String,Object>> getTopByCategoriesForUser(String userId) throws SQLException {
-        String sql = """
-        WITH my_cat AS (
-          SELECT b.category, COUNT(*) c
-          FROM borrow_records br
-          JOIN books b ON b.id = br.book_id
-          WHERE br.user_id = ?
-          GROUP BY b.category
-          ORDER BY c DESC
-          LIMIT 3
-        )
-        SELECT b.*
-        FROM books b
-        JOIN my_cat mc ON mc.category = b.category
-        LEFT JOIN borrow_records br_me
-               ON br_me.user_id = ? AND br_me.book_id = b.id
-        WHERE br_me.id IS NULL
-        ORDER BY b.title
-        LIMIT 20
-    """;
-        try (Connection c = DatabaseManager.getConnection();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, userId);
-            ps.setString(2, userId);
-            try (ResultSet rs = ps.executeQuery()) {
-                java.util.List<java.util.Map<String,Object>> out = new java.util.ArrayList<>();
-                java.sql.ResultSetMetaData md = rs.getMetaData();
-                int n = md.getColumnCount();
-                while (rs.next()) {
-                    java.util.Map<String,Object> row = new java.util.LinkedHashMap<>();
-                    for (int i = 1; i <= n; i++) row.put(md.getColumnLabel(i), rs.getObject(i));
-                    out.add(row);
-                }
-                return out;
-            }
-        }
-    }
     public java.util.List<Book> suggestForUser(String userId, int limit) throws SQLException {
         String sql = """
         WITH my_cat AS (

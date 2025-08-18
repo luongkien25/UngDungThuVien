@@ -109,7 +109,6 @@ public class AdminGUI extends JFrame {
                 "SELF HELP","PRODUCTIVITY","STARTUPS","MARKETING","FINANCE","INVESTMENT","NETWORKING"
         };
         final JComboBox<String> categoryBox = new JComboBox<>(quickTerms);
-        // categoryBox.setEditable(true); // nếu muốn cho gõ thêm ngay trong combo
 
         final JPanel rightTop = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         rightTop.setOpaque(false);
@@ -143,11 +142,9 @@ public class AdminGUI extends JFrame {
         // render lần đầu
         doSearch.run();
 
-        // bind nút/enter
         searchBtn.addActionListener(ev -> doSearch.run());
         searchField.addActionListener(ev -> doSearch.run());
 
-        // Khi đổi mục trong combo: điền vào ô search rồi search luôn
         categoryBox.addActionListener(ev -> {
             String sel = String.valueOf(categoryBox.getSelectedItem());
             if ("All".equalsIgnoreCase(sel)) searchField.setText("");
@@ -156,7 +153,6 @@ public class AdminGUI extends JFrame {
             searchField.requestFocusInWindow();
         });
 
-        // (tuỳ chọn) ESC để xoá nhanh ô search
         javax.swing.KeyStroke esc = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0);
         searchField.getInputMap(JComponent.WHEN_FOCUSED).put(esc, "clearSearch");
         searchField.getActionMap().put("clearSearch", new AbstractAction() {
@@ -197,7 +193,6 @@ public class AdminGUI extends JFrame {
                     BorderFactory.createEmptyBorder(10, 10, 10, 10)
             ));
 
-            // Badge "Borrowed: N"
             long cnt = 0;
             try {
                 if (b.getId() != null && !b.getId().isBlank()) {
@@ -245,7 +240,6 @@ public class AdminGUI extends JFrame {
         });
     }
 
-    /* ================== HÀNH VI NÚT KHÁC (giữ y như bản trước) ================== */
 
     private void addDocument() {
         String title = JOptionPane.showInputDialog(this, "Enter title:");
