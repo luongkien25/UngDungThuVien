@@ -3,8 +3,7 @@ package org.example;
 import java.util.List;
 
 public interface LibraryUser {
-    /**private String userID;
-    private String password;*/
+
     String getUserId();
     void setUserId(String userId);
 
@@ -13,12 +12,10 @@ public interface LibraryUser {
 
     List<BorrowRecord> getBorrowRecord();
 
-    // Tổng quát - tất cả loại tài liệu
     List<LibraryItem> getBorrowedItems();
     void borrowItem(LibraryItem item);
     void returnItem(LibraryItem item);
 
-    // Nếu vẫn muốn giữ cho sách (optional)
     default void borrowBook(Book book) {
         borrowItem(book);
     }
