@@ -21,6 +21,22 @@ public class AdminGUI extends JFrame {
         setLayout(new BorderLayout());
         add(centerRoot, BorderLayout.CENTER);
 
+        // Mở to màn hình khi khởi động + đặt kích thước tối thiểu
+        setMinimumSize(new Dimension(1200, 800));
+        setExtendedState(getExtendedState() | JFrame.MAXIMIZED_BOTH);
+
+        // ===== Menubar (phòng khi nút bị khuất, vẫn có Logout) =====
+        JMenuBar mb = new JMenuBar();
+        JMenu menuSession = new JMenu("Session");
+        JMenuItem miLogout = new JMenuItem("Logout");
+        miLogout.setAccelerator(javax.swing.KeyStroke.getKeyStroke(
+                java.awt.event.KeyEvent.VK_L,
+                java.awt.event.InputEvent.CTRL_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK));
+        miLogout.addActionListener(e -> doLogout());
+        menuSession.add(miLogout);
+        mb.add(menuSession);
+        setJMenuBar(mb);
+
         // ===== Bottom bar =====
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER));
         JButton btnAddDoc   = new JButton("➕📄 Add Document");
@@ -28,6 +44,7 @@ public class AdminGUI extends JFrame {
         JButton btnBR       = new JButton("📝 DisplayBorrowRecords");
         JButton btnSearchG  = new JButton("🔍📘 Search Google Books");
         JButton btnUInfo    = new JButton("👤ℹ️ Display User Info");
+        JButton btnChangeUserPw = new JButton("🔑 Change User Password"); // NEW
         JButton btnChangePw = new JButton("🔑 Change Password");
         JButton btnLogout   = new JButton("🚪 Logout");
         bottom.add(btnAddDoc);
@@ -35,6 +52,7 @@ public class AdminGUI extends JFrame {
         bottom.add(btnBR);
         bottom.add(btnSearchG);
         bottom.add(btnUInfo);
+        bottom.add(btnChangeUserPw); // NEW
         bottom.add(btnChangePw);
         bottom.add(btnLogout);
         add(bottom, BorderLayout.SOUTH);
@@ -45,6 +63,7 @@ public class AdminGUI extends JFrame {
         btnBR.addActionListener(e -> displayBorrowRecords());
         btnSearchG.addActionListener(e -> searchGoogleBooks());
         btnUInfo.addActionListener(e -> displayUserInfo(true));
+        btnChangeUserPw.addActionListener(e -> changeAnyUserPassword()); // NEW
         btnChangePw.addActionListener(e -> changeAdminPassword());
         btnLogout.addActionListener(e -> doLogout());
 
@@ -428,7 +447,7 @@ public class AdminGUI extends JFrame {
     private void displayUserInfo(boolean onlyActive) {
         List<UserBorrowStat> stats;
         try {
-            stats = new UserDAO().getUserBorrowStats(onlyActive);
+            stats = new UserDAO().getUserStats(onlyActive);
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "DB error: " + e.getMessage());
             return;
@@ -458,7 +477,7 @@ public class AdminGUI extends JFrame {
         sp.setPreferredSize(new Dimension(700, 400));
 
         JOptionPane.showMessageDialog(this, sp,
-                onlyActive ? "Users (đang mượn)" : "Users (tổng số lượt mượn)",
+                onlyActive ? "Users" : "Users (tổng số lượt mượn)",
                 JOptionPane.PLAIN_MESSAGE);
     }
 
@@ -478,6 +497,41 @@ public class AdminGUI extends JFrame {
                     new String(oldF.getPassword()),
                     new String(newF.getPassword()));
             JOptionPane.showMessageDialog(this, ok ? "Password updated." : "Wrong old password.");
+        } catch (java.sql.SQLException ex) {
+            JOptionPane.showMessageDialog(this, "DB error: " + ex.getMessage());
+        }
+    }
+
+    /** Admin đổi mật khẩu cho 1 user thường (không cần mật khẩu cũ) */
+    private void changeAnyUserPassword() {
+        // Lọc chỉ user thường
+        java.util.List<LibraryUser> all = library.getUsers();
+        java.util.List<User> users = new java.util.ArrayList<>();
+        for (LibraryUser lu : all) if (lu instanceof User u && !u.isAdmin()) users.add(u);
+        if (users.isEmpty()) { JOptionPane.showMessageDialog(this, "No USER accounts found."); return; }
+
+        // Combo chọn user theo "userId - name"
+        String[] opts = users.stream().map(u -> u.getUserId() + " - " + u.getName()).toArray(String[]::new);
+        JComboBox<String> cmb = new JComboBox<>(opts);
+        JPasswordField newPwF = new JPasswordField();
+
+        Object[] msg = {
+                "Select user:", cmb,
+                "New password:", newPwF
+        };
+        int ok = JOptionPane.showConfirmDialog(this, msg, "Change User Password", JOptionPane.OK_CANCEL_OPTION);
+        if (ok != JOptionPane.OK_OPTION) return;
+
+        String sel = String.valueOf(cmb.getSelectedItem());
+        if (sel == null || sel.isBlank()) return;
+        String uid = sel.split(" - ", 2)[0].trim();
+        String newPw = new String(newPwF.getPassword());
+        if (newPw.isEmpty()) { JOptionPane.showMessageDialog(this, "Password cannot be empty."); return; }
+
+        try {
+            boolean updated = new UserDAO().adminSetPassword(uid, newPw); // phương thức mới ở UserDAO
+            JOptionPane.showMessageDialog(this, updated ? "Password updated for user: " + uid
+                    : "Failed to update password.");
         } catch (java.sql.SQLException ex) {
             JOptionPane.showMessageDialog(this, "DB error: " + ex.getMessage());
         }

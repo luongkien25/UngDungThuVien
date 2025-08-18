@@ -237,22 +237,45 @@ public class BookDAO {
     public java.util.List<Book> suggestForUser(String userId, int limit) throws SQLException {
         String sql = """
         WITH my_cat AS (
-          SELECT b.category, COUNT(*) c
-          FROM borrow_records br
-          JOIN books b ON b.id = br.book_id
-          WHERE br.user_id = ?
-          GROUP BY b.category
-          ORDER BY c DESC
-          LIMIT 3
-        )
-        SELECT b.id, b.isbn, b.title, b.authors, b.category, b.quantity, b.thumbnail_link
-        FROM books b
-        JOIN my_cat mc ON mc.category = b.category
-        LEFT JOIN borrow_records br_me
-               ON br_me.user_id = ? AND br_me.book_id = b.id
-        WHERE br_me.id IS NULL
-        ORDER BY b.title
-        LIMIT ?
+                 SELECT b.category, COUNT(*) c
+                 FROM borrow_records br
+                 JOIN books b ON b.id = br.book_id
+                 WHERE br.user_id = ?
+                 GROUP BY b.category
+                 ORDER BY c DESC
+                 LIMIT 3
+               ),
+               fav_books AS (
+                 SELECT b.*
+                 FROM books b
+                 WHERE b.category IN (SELECT category FROM my_cat)
+               ),
+               global_pop AS (
+                 -- sách phổ biến toàn hệ thống (fallback)
+                 SELECT b.*, COUNT(br.id) AS pop
+                 FROM books b
+                 LEFT JOIN borrow_records br ON br.book_id = b.id
+                 GROUP BY b.id
+               )
+               SELECT
+                 x.id, x.isbn, x.title, x.authors, x.category, x.quantity, x.thumbnail_link
+               FROM (
+                  -- nếu có my_cat → lấy từ fav_books; nếu không, lấy từ global_pop
+                  SELECT fb.id, fb.isbn, fb.title, fb.authors, fb.category, fb.quantity, fb.thumbnail_link, 1 AS src
+                  FROM fav_books fb
+                  UNION ALL
+                  SELECT gp.id, gp.isbn, gp.title, gp.authors, gp.category, gp.quantity, gp.thumbnail_link, 2 AS src
+                  FROM global_pop gp
+               ) AS x
+               LEFT JOIN borrow_records br_me
+                      ON br_me.user_id = ? AND br_me.book_id = x.id AND br_me.return_date IS NULL  -- chỉ loại sách ĐANG mượn
+               WHERE
+                 (x.src = 1 OR NOT EXISTS (SELECT 1 FROM my_cat)) -- có lịch sử thì ưu tiên fav_books; nếu không có, dùng global_pop
+                 AND x.quantity > 0
+               ORDER BY
+                 x.src,                                -- ưu tiên nguồn 1 (fav) trước nguồn 2 (global)
+                 x.title
+               LIMIT ?;
     """;
         try (Connection c = DatabaseManager.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {

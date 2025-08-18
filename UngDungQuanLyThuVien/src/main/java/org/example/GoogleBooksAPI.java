@@ -45,7 +45,6 @@ public class GoogleBooksAPI {
                     thumbnail = imageLinks.optString("thumbnail", "");
                 }
 
-                //Đưa ảnh thumbnail trực tiếp vào constructor
                 Book book = new Book(title, authors, category, isbn, 1, thumbnail);
                 books.add(book);
             }

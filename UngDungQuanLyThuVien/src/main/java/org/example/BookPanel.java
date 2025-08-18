@@ -5,7 +5,7 @@ import java.awt.*;
 
 public class BookPanel extends JPanel {
     private final Book book;
-    private final Runnable onRefresh; // callback để render lại danh sách sau Update/Remove
+    private final Runnable onRefresh;
     private JButton borrowButton;
     private JButton updateButton;
     private JButton removeButton;

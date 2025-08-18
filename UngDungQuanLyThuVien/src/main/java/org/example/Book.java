@@ -29,7 +29,7 @@ public class Book implements LibraryItem {
 
     // ====== getters/setters cơ bản ======
     public String getThumbnailLink() { return thumbnailLink; }
-    public void setThumbnailLink(String thumbnailLink) { this.thumbnailLink = thumbnailLink; }
+    public void setThumbnailLink(String thumbnailLink) { this.thumbnailLink = thumbnailLink;}
     public String getDescription() { return authors + " - " + category; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }

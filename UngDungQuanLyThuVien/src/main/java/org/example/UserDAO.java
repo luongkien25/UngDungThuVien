@@ -31,13 +31,14 @@ public class UserDAO {
     }
 
     // Trong UserDAO
-    public List<UserBorrowStat> getUserBorrowStats(boolean onlyActive) throws SQLException {
+    public List<UserBorrowStat> getUserStats(boolean onlyActive) throws SQLException {
         String sql = onlyActive
                 ? """
           SELECT u.user_id, u.name, u.role, COALESCE(COUNT(br.id),0) AS borrow_count
            FROM users u
-           INNER JOIN borrow_records br
-             ON br.user_id = u.user_id and u.role = "USER"
+           LEFT JOIN borrow_records br
+             ON br.user_id = u.user_id 
+           WHERE u.role = "USER"
            GROUP BY u.user_id, u.name, u.role
            ORDER BY borrow_count DESC, u.name ASC
           """
@@ -298,6 +299,24 @@ public class UserDAO {
             ps.setString(2, newSalt);
             ps.setString(3, userId);
             return ps.executeUpdate() > 0;
+        }
+    }
+
+    public boolean adminSetPassword(String userId, String newRaw) throws SQLException {
+        String newSalt = PasswordUtil.generateSalt();
+        String newHash = PasswordUtil.hashPassword(newRaw == null ? "" : newRaw, newSalt);
+
+        // Chặn đổi mật khẩu cho tài khoản ADMIN
+        String sql = "UPDATE users " +
+                "SET password_hash = ?, password_salt = ? " +
+                "WHERE user_id = ? AND UPPER(role) <> 'ADMIN'";
+
+        try (Connection c = DatabaseManager.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, newHash);
+            ps.setString(2, newSalt);
+            ps.setString(3, userId);
+            return ps.executeUpdate() > 0;  // true nếu cập nhật thành công
         }
     }
 
