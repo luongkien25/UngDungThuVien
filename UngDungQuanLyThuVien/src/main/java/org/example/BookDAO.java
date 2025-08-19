@@ -2,7 +2,7 @@ package org.example;
 
 import java.sql.*;
 import java.util.ArrayList;
-
+import java.util.Map;
 public class BookDAO {
 
     public ArrayList<LibraryItem> getAllBooks() throws SQLException {
@@ -265,19 +265,19 @@ public class BookDAO {
         }
     }
 
-    public java.util.Map<Integer, Long> getBorrowCountsMap() throws SQLException {
+    public Map<String, Long> getBorrowCountsMap() throws SQLException {
         String sql = """
         SELECT b.id, COUNT(br.id) AS cnt
         FROM books b
         LEFT JOIN borrow_records br ON br.book_id = b.id
         GROUP BY b.id
     """;
-        java.util.Map<Integer, Long> map = new java.util.HashMap<>();
+        Map<String, Long> map = new java.util.HashMap<>();
         try (Connection c = DatabaseManager.getConnection();
              PreparedStatement ps = c.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
-                map.put(rs.getInt("id"), rs.getLong("cnt"));
+                map.put(rs.getString("id"), rs.getLong("cnt"));
             }
         }
         return map;

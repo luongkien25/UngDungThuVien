@@ -4,8 +4,9 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.text.Collator;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 public class AdminGUI extends JFrame {
     private final Library library = Library.getInstance();
@@ -25,7 +26,7 @@ public class AdminGUI extends JFrame {
         setMinimumSize(new Dimension(1200, 800));
         setExtendedState(getExtendedState() | JFrame.MAXIMIZED_BOTH);
 
-        // ===== Menubar (phòng khi nút bị khuất, vẫn có Logout) =====
+        // ===== Menubar =====
         JMenuBar mb = new JMenuBar();
         JMenu menuSession = new JMenu("Session");
         JMenuItem miLogout = new JMenuItem("Logout");
@@ -44,7 +45,7 @@ public class AdminGUI extends JFrame {
         JButton btnBR       = new JButton("📝 DisplayBorrowRecords");
         JButton btnSearchG  = new JButton("🔍📘 Search Google Books");
         JButton btnUInfo    = new JButton("👤ℹ️ Display User Info");
-        JButton btnChangeUserPw = new JButton("🔑 Change User Password"); // NEW
+        JButton btnChangeUserPw = new JButton("🔑 Change User Password");
         JButton btnChangePw = new JButton("🔑 Change Password");
         JButton btnLogout   = new JButton("🚪 Logout");
         bottom.add(btnAddDoc);
@@ -52,7 +53,7 @@ public class AdminGUI extends JFrame {
         bottom.add(btnBR);
         bottom.add(btnSearchG);
         bottom.add(btnUInfo);
-        bottom.add(btnChangeUserPw); // NEW
+        bottom.add(btnChangeUserPw);
         bottom.add(btnChangePw);
         bottom.add(btnLogout);
         add(bottom, BorderLayout.SOUTH);
@@ -63,7 +64,7 @@ public class AdminGUI extends JFrame {
         btnBR.addActionListener(e -> displayBorrowRecords());
         btnSearchG.addActionListener(e -> searchGoogleBooks());
         btnUInfo.addActionListener(e -> displayUserInfo(true));
-        btnChangeUserPw.addActionListener(e -> changeAnyUserPassword()); // NEW
+        btnChangeUserPw.addActionListener(e -> changeAnyUserPassword());
         btnChangePw.addActionListener(e -> changeAdminPassword());
         btnLogout.addActionListener(e -> doLogout());
 
@@ -98,10 +99,9 @@ public class AdminGUI extends JFrame {
 
         final JButton searchBtn = new JButton("Search");
 
-        // ===== Thay nút Clear bằng combo “thể loại nhanh” (điền chuỗi vào ô Search) =====
+        // Quick category box
         final String[] quickTerms = new String[]{
-                "ALL",
-                "NOVEL","HISTORY","SCIENCE","MATHEMATICS","ENGINEERING","COMPUTER","PROGRAMMING","JAVA","DATABASE","ART",
+                "ALL","NOVEL","HISTORY","SCIENCE","MATHEMATICS","ENGINEERING","COMPUTER","PROGRAMMING","JAVA","DATABASE","ART",
                 "ECONOMICS","BUSINESS","MANAGEMENT","PHILOSOPHY","PSYCHOLOGY","EDUCATION","CHILDREN","FANTASY","MYSTERY",
                 "MACHINE LEARNING","DATA SCIENCE","CHEMISTRY","PHYSICS","BIOLOGY","MEDICINE","LAW","POLITICS",
                 "CULTURE","MUSIC","DESIGN","ARCHITECTURE","PHOTOGRAPHY","TRAVEL","COOKING","HEALTH","SPORT",
@@ -110,9 +110,22 @@ public class AdminGUI extends JFrame {
         };
         final JComboBox<String> categoryBox = new JComboBox<>(quickTerms);
 
+        // Sort options
+        final String[] sortOptions = new String[]{
+                "None",
+                "Tên (A→Z)",
+                "Tên (Z→A)",
+                "Borrowed (nhiều→ít)",
+                "Borrowed (ít→nhiều)",
+                "Quantity (nhiều→ít)",
+                "Quantity (ít→nhiều)"
+        };
+        final JComboBox<String> sortBox = new JComboBox<>(sortOptions);
+
         final JPanel rightTop = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         rightTop.setOpaque(false);
         rightTop.add(categoryBox);
+        rightTop.add(sortBox);
         rightTop.add(searchBtn);
 
         topBar.add(new JLabel("Search:"), BorderLayout.WEST);
@@ -122,19 +135,38 @@ public class AdminGUI extends JFrame {
         // callback refresh cho BookPanel
         final Runnable[] doSearchRef = new Runnable[1];
 
-        // hàm render luôn dùng dữ liệu MỚI từ RAM + count MỚI từ DB
         final Runnable doSearch = () -> {
             String q = searchField.getText().trim();
-            java.util.List<Book> toShow = q.isEmpty()
+            List<Book> toShow = q.isEmpty()
                     ? getAllBooksFromRAM()
-                    : java.util.Optional.ofNullable(library.search(q)).orElse(java.util.Collections.emptyList());
-            java.util.Map<Integer, Long> countMap = freshCountMap();
+                    : Optional.ofNullable(library.search(q)).orElse(Collections.emptyList());
+
+            // lấy countMap (String->Long) để hiển thị và sort theo Borrowed
+            Map<String, Long> countMap = freshCountMap();
+
+            // Sort theo lựa chọn
+            Collator vi = Collator.getInstance(new Locale("vi", "VN"));
+            String sortSel = String.valueOf(sortBox.getSelectedItem());
+
+            toShow.sort((b1, b2) -> {
+                String t1 = b1.getTitle() == null ? "" : b1.getTitle();
+                String t2 = b2.getTitle() == null ? "" : b2.getTitle();
+                long c1 = borrowedOf(countMap, b1);
+                long c2 = borrowedOf(countMap, b2);
+                switch (sortSel) {
+                    case "Tên (A→Z)": return vi.compare(t1, t2);
+                    case "Tên (Z→A)": return -vi.compare(t1, t2);
+                    case "Borrowed (nhiều→ít)": return Long.compare(c2, c1);
+                    case "Borrowed (ít→nhiều)": return Long.compare(c1, c2);
+                    case "Quantity (nhiều→ít)": return Integer.compare(b2.getQuantity(), b1.getQuantity());
+                    case "Quantity (ít→nhiều)": return Integer.compare(b1.getQuantity(), b2.getQuantity());
+                    case "None": default: return 0;
+                }
+            });
+
             renderBooksAdmin(listPanel, toShow, countMap,
                     () -> { if (doSearchRef[0] != null) doSearchRef[0].run(); },
-                    false,  // Borrow off (Admin)
-                    true,   // Update on
-                    true    // Remove on
-            );
+                    false, true, true);
             scrollToTop(scrollPane);
         };
         doSearchRef[0] = doSearch;
@@ -144,7 +176,6 @@ public class AdminGUI extends JFrame {
 
         searchBtn.addActionListener(ev -> doSearch.run());
         searchField.addActionListener(ev -> doSearch.run());
-
         categoryBox.addActionListener(ev -> {
             String sel = String.valueOf(categoryBox.getSelectedItem());
             if ("All".equalsIgnoreCase(sel)) searchField.setText("");
@@ -152,14 +183,7 @@ public class AdminGUI extends JFrame {
             doSearch.run();
             searchField.requestFocusInWindow();
         });
-
-        javax.swing.KeyStroke esc = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0);
-        searchField.getInputMap(JComponent.WHEN_FOCUSED).put(esc, "clearSearch");
-        searchField.getActionMap().put("clearSearch", new AbstractAction() {
-            @Override public void actionPerformed(java.awt.event.ActionEvent e) {
-                if (!searchField.getText().isEmpty()) searchField.setText("");
-            }
-        });
+        sortBox.addActionListener(ev -> doSearch.run());
 
         centerRoot.add(topBar, BorderLayout.NORTH);
         centerRoot.add(scrollPane, BorderLayout.CENTER);
@@ -167,9 +191,9 @@ public class AdminGUI extends JFrame {
         centerRoot.repaint();
     }
 
-    /** render card giống LibraryGUI + badge Borrowed:N; truyền chính instance Book trong RAM */
+    /** render card giống LibraryGUI + badge Borrowed:N */
     private void renderBooksAdmin(JPanel listPanel, List<Book> books,
-                                  Map<Integer, Long> countMap,
+                                  Map<String, Long> countMap,
                                   Runnable onRefresh,
                                   boolean showBorrow, boolean showUpdate, boolean showRemove) {
         listPanel.removeAll();
@@ -193,12 +217,7 @@ public class AdminGUI extends JFrame {
                     BorderFactory.createEmptyBorder(10, 10, 10, 10)
             ));
 
-            long cnt = 0;
-            try {
-                if (b.getId() != null && !b.getId().isBlank()) {
-                    cnt = countMap.getOrDefault(Integer.parseInt(b.getId()), 0L);
-                }
-            } catch (Exception ignore) {}
+            long cnt = borrowedOf(countMap, b);
             JLabel badge = new JLabel("Borrowed: " + cnt);
             JPanel header = new JPanel(new BorderLayout());
             header.setOpaque(false);
@@ -214,9 +233,8 @@ public class AdminGUI extends JFrame {
                             + java.net.URLEncoder.encode(b.getTitle(), java.nio.charset.StandardCharsets.UTF_8)
                             + "+site:books.google.com";
                 } else {
-                    qrContent = "https://books.google.com"; // fallback nếu không có title
+                    qrContent = "https://books.google.com";
                 }
-
                 BufferedImage qr = QRCodeGenerator.generateQRCodeImage(qrContent, 120, 120);
                 JLabel qrLabel = new JLabel(new ImageIcon(qr));
                 qrLabel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
@@ -240,38 +258,106 @@ public class AdminGUI extends JFrame {
         });
     }
 
+    // ===== Helpers =====
+
+    private List<Book> getAllBooksFromRAM() {
+        List<Book> list = new ArrayList<>();
+        for (LibraryItem li : library.getItems()) if (li instanceof Book b) list.add(b);
+        return list;
+    }
+
+    /** Lấy map đếm số bản đang mượn theo book_id (String) */
+    private Map<String, Long> freshCountMap() {
+        try {
+            return new BookDAO().getBorrowCountsMap(); // Map<String,Long>
+        } catch (Exception e) {
+            return Collections.emptyMap();
+        }
+    }
+
+    private static long borrowedOf(Map<String, Long> countMap, Book b) {
+        if (b == null || b.getId() == null) return 0L;
+        return countMap.getOrDefault(b.getId(), 0L);
+    }
+
+    // ===== Các hàm còn lại giữ nguyên =====
 
     private void addDocument() {
-        String title = JOptionPane.showInputDialog(this, "Enter title:");
-        if (title == null) return;
-
-        String authors = JOptionPane.showInputDialog(this, "Enter authors:");
-        if (authors == null) return;
-
-        String category = JOptionPane.showInputDialog(this, "Enter category:");
-        if (category == null) return;
-
-        String isbn = JOptionPane.showInputDialog(this, "Enter ISBN:");
-        if (isbn == null) return;
-
-        String quantityStr = JOptionPane.showInputDialog(this, "Enter quantity:");
-        if (quantityStr == null) return;
-
-        String thumbnailLink = JOptionPane.showInputDialog(this, "Enter thumbnail link:");
-        int quantity;
-        try { quantity = Integer.parseInt(quantityStr); }
-        catch (NumberFormatException e) { JOptionPane.showMessageDialog(this, "Invalid quantity."); return; }
-
-        Book book = new Book(title, authors, category, isbn, quantity, thumbnailLink);
+        Book book = promptNewBook(this);
+        if (book == null) return;
 
         try {
-            new BookDAO().insertBook(book); // DB
+            new BookDAO().insertBook(book); // DB (đã gom quantity nếu trùng)
             library.addItem(book);          // RAM (đúng instance)
             JOptionPane.showMessageDialog(this, "Document added.");
-            showDisplayView();              // refresh
+            showDisplayView();              // refresh UI
         } catch (java.sql.SQLException e) {
             JOptionPane.showMessageDialog(this, "DB error: " + e.getMessage());
         }
+    }
+
+    // ===== helper cho ADDDCMT =====
+    private Book promptNewBook(Component parent) {
+        JTextField tfTitle    = new JTextField();
+        JTextField tfAuthors  = new JTextField();
+        JTextField tfCategory = new JTextField();
+        JTextField tfIsbn     = new JTextField();
+        JTextField tfThumb    = new JTextField();
+
+        JSpinner spQuantity = new JSpinner(new SpinnerNumberModel(1, 0, Integer.MAX_VALUE, 1));
+
+        JPanel form = new JPanel(new GridBagLayout());
+        GridBagConstraints gc = new GridBagConstraints();
+        gc.insets = new Insets(6, 6, 6, 6);
+        gc.fill = GridBagConstraints.HORIZONTAL;
+        gc.weightx = 1;
+
+        int r = 0;
+        gc.gridx = 0; gc.gridy = r; gc.weightx = 0; form.add(new JLabel("Title*:"), gc);
+        gc.gridx = 1; gc.gridy = r++; gc.weightx = 1; form.add(tfTitle, gc);
+
+        gc.gridx = 0; gc.gridy = r; gc.weightx = 0; form.add(new JLabel("Authors:"), gc);
+        gc.gridx = 1; gc.gridy = r++; gc.weightx = 1; form.add(tfAuthors, gc);
+
+        gc.gridx = 0; gc.gridy = r; gc.weightx = 0; form.add(new JLabel("Category:"), gc);
+        gc.gridx = 1; gc.gridy = r++; gc.weightx = 1; form.add(tfCategory, gc);
+
+        gc.gridx = 0; gc.gridy = r; gc.weightx = 0; form.add(new JLabel("ISBN:"), gc);
+        gc.gridx = 1; gc.gridy = r++; gc.weightx = 1; form.add(tfIsbn, gc);
+
+        gc.gridx = 0; gc.gridy = r; gc.weightx = 0; form.add(new JLabel("Quantity:"), gc);
+        gc.gridx = 1; gc.gridy = r++; gc.weightx = 1; form.add(spQuantity, gc);
+
+        gc.gridx = 0; gc.gridy = r; gc.weightx = 0; form.add(new JLabel("Thumbnail link:"), gc);
+        gc.gridx = 1; gc.gridy = r++; gc.weightx = 1; form.add(tfThumb, gc);
+
+        int ok = JOptionPane.showConfirmDialog(
+                parent, form, "Add new document", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE
+        );
+        if (ok != JOptionPane.OK_OPTION) return null;
+
+        // ==== validate tối thiểu ====
+        String title    = tfTitle.getText().trim();
+        String authors  = tfAuthors.getText().trim();
+        String category = tfCategory.getText().trim();
+        String isbn     = tfIsbn.getText().trim();
+        String thumb    = tfThumb.getText().trim();
+        int qty         = (int) spQuantity.getValue();
+
+        if (title.isEmpty()) {
+            JOptionPane.showMessageDialog(parent, "Title là bắt buộc.");
+            return null;
+        }
+        if (qty < 0) {
+            JOptionPane.showMessageDialog(parent, "Quantity không hợp lệ.");
+            return null;
+        }
+
+        // Cho phép để ISBN trống -> DAO sẽ lưu null (không phải 'N/A')
+        // Nếu bạn vẫn muốn hiển thị 'N/A' trên UI thì cứ set 'N/A' ở đây, DAO đã xử lý chuyển thành null.
+        if (isbn.isEmpty()) isbn = "N/A";
+
+        return new Book(title, authors, category, isbn, qty, thumb);
     }
 
     private void addUser() {
@@ -539,18 +625,8 @@ public class AdminGUI extends JFrame {
         }
         Session.logout();
         JOptionPane.showMessageDialog(this, "Logged out: " + u.getName());
-        SwingUtilities.invokeLater(() -> new LibraryAppUI());
+        SwingUtilities.invokeLater(LibraryAppUI::new);
         dispose();
     }
-
-    private java.util.List<Book> getAllBooksFromRAM() {
-        java.util.List<Book> list = new java.util.ArrayList<>();
-        for (LibraryItem li : library.getItems()) if (li instanceof Book b) list.add(b);
-        return list;
-    }
-
-    private java.util.Map<Integer, Long> freshCountMap() {
-        try { return new BookDAO().getBorrowCountsMap(); }
-        catch (java.sql.SQLException e) { return java.util.Collections.emptyMap(); }
-    }
 }
+

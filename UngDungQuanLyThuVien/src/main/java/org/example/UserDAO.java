@@ -214,38 +214,6 @@ public class UserDAO {
         }
     }
 
-    // Danh sách sách đang mượn (ưu tiên quá hạn)
-    public List<Book> listActiveBorrowedBooks(String userId) throws SQLException {
-        String sql = """
-            SELECT b.id AS book_id, b.isbn, b.title, b.authors, b.category, b.quantity, b.thumbnail_link,
-                   br.borrow_date, br.due_date
-            FROM borrow_records br
-            JOIN books b ON b.id = br.book_id
-            WHERE br.user_id = ? AND br.return_date IS NULL
-            ORDER BY (NOW() > br.due_date) DESC, br.due_date ASC, br.borrow_date DESC
-        """;
-        try (Connection c = DatabaseManager.getConnection();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, userId);
-            try (ResultSet rs = ps.executeQuery()) {
-                List<Book> list = new ArrayList<>();
-                while (rs.next()) {
-                    Book b = new Book(
-                            rs.getString("title"),
-                            rs.getString("authors"),
-                            rs.getString("category"),
-                            rs.getString("isbn"),
-                            rs.getInt("quantity"),
-                            rs.getString("thumbnail_link")
-                    );
-                    b.setId(String.valueOf(rs.getInt("book_id")));
-                    list.add(b);
-                }
-                return list;
-            }
-        }
-    }
-
     // Đổi mật khẩu (user tự đổi)
     public boolean changePassword(String userId, String oldRaw, String newRaw) throws SQLException {
         String select = "SELECT password_hash, password_salt FROM users WHERE user_id=?";
@@ -333,35 +301,6 @@ public class UserDAO {
         }
     }
 
-    // Lấy danh sách "đã đọc gần đây" (dạng Map thô)
-    public List<Map<String, Object>> getRecentlyRead(String userId, int limit) throws SQLException {
-        String sql = """
-            SELECT b.id, b.title, b.authors, b.category, br.return_date
-            FROM borrow_records br
-            JOIN books b ON b.id = br.book_id
-            WHERE br.user_id = ? AND br.return_date IS NOT NULL
-            ORDER BY br.return_date DESC
-            LIMIT ?
-        """;
-        try (Connection c = DatabaseManager.getConnection();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, userId);
-            ps.setInt(2, limit);
-            try (ResultSet rs = ps.executeQuery()) {
-                List<Map<String, Object>> out = new ArrayList<>();
-                while (rs.next()) {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("id", rs.getInt("id"));
-                    m.put("title", rs.getString("title"));
-                    m.put("authors", rs.getString("authors"));
-                    m.put("category", rs.getString("category"));
-                    m.put("return_date", rs.getTimestamp("return_date"));
-                    out.add(m);
-                }
-                return out;
-            }
-        }
-    }
 
     // Lấy danh sách "đã đọc gần đây" (trả về Book)
     public List<Book> getRecentlyReadBooks(String userId, int limit) throws SQLException {
