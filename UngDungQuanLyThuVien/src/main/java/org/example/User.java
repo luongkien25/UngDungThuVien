@@ -3,10 +3,10 @@ package org.example;
 import java.util.*;
 
 public class User implements LibraryUser {
-    private String userId;
-    private String name;
+    protected String userId;
+    protected String name;
     private final List<BorrowRecord> borrowRecord = new ArrayList<>();
-    private String role;
+    protected String role;
     public User(String userId, String name) { this.userId = userId; this.name = name; }
     public User(String userId, String name, String role) {
         this.userId = userId;

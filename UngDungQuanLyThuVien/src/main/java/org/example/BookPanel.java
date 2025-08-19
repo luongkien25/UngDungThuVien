@@ -96,26 +96,54 @@ public class BookPanel extends JPanel {
         if (showUpdate) {
             updateButton = new JButton("Update");
             updateButton.addActionListener(e -> {
-                String newTitle = JOptionPane.showInputDialog(this, "New title:", book.getTitle());
-                if (newTitle == null) return;
+                // ==== Form cập nhật 1 lần ====
+                JTextField tfTitle    = new JTextField(book.getTitle()    != null ? book.getTitle()    : "");
+                JTextField tfAuthors  = new JTextField(book.getAuthors()  != null ? book.getAuthors()  : "");
+                JTextField tfCategory = new JTextField(book.getCategory() != null ? book.getCategory() : "");
+                JSpinner spQuantity   = new JSpinner(new SpinnerNumberModel(
+                        Math.max(0, book.getQuantity()), // không âm
+                        0, Integer.MAX_VALUE, 1
+                ));
 
-                String newAuthors = JOptionPane.showInputDialog(this, "New authors:", book.getAuthors());
-                if (newAuthors == null) return;
+                JPanel form = new JPanel(new GridBagLayout());
+                GridBagConstraints gc = new GridBagConstraints();
+                gc.insets = new Insets(6, 6, 6, 6);
+                gc.fill = GridBagConstraints.HORIZONTAL;
 
-                String newCategory = JOptionPane.showInputDialog(this, "New category:", book.getCategory());
-                if (newCategory == null) return;
+                int r = 0;
+                gc.gridx = 0; gc.gridy = r; form.add(new JLabel("Title:"), gc);
+                gc.gridx = 1; gc.gridy = r++; form.add(tfTitle, gc);
 
-                String qtyStr = JOptionPane.showInputDialog(this, "New quantity:", book.getQuantity());
-                if (qtyStr == null) return;
+                gc.gridx = 0; gc.gridy = r; form.add(new JLabel("Authors:"), gc);
+                gc.gridx = 1; gc.gridy = r++; form.add(tfAuthors, gc);
 
-                int newQty;
-                try {
-                    newQty = Integer.parseInt(qtyStr.trim());
-                } catch (NumberFormatException ex) {
-                    JOptionPane.showMessageDialog(this, "Invalid quantity.");
+                gc.gridx = 0; gc.gridy = r; form.add(new JLabel("Category:"), gc);
+                gc.gridx = 1; gc.gridy = r++; form.add(tfCategory, gc);
+
+                gc.gridx = 0; gc.gridy = r; form.add(new JLabel("Quantity:"), gc);
+                gc.gridx = 1; gc.gridy = r++; form.add(spQuantity, gc);
+
+                int ok = JOptionPane.showConfirmDialog(
+                        this, form, "Update document", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE
+                );
+                if (ok != JOptionPane.OK_OPTION) return;
+
+                // ==== Lấy dữ liệu từ form + validate cơ bản ====
+                String newTitle    = tfTitle.getText().trim();
+                String newAuthors  = tfAuthors.getText().trim();
+                String newCategory = tfCategory.getText().trim();
+                int newQty         = (int) spQuantity.getValue();
+
+                if (newTitle.isEmpty()) {
+                    JOptionPane.showMessageDialog(this, "Title không được để trống.");
+                    return;
+                }
+                if (newQty < 0) {
+                    JOptionPane.showMessageDialog(this, "Quantity không hợp lệ.");
                     return;
                 }
 
+                // ==== Ghi DB (ưu tiên ID, fallback ISBN) ====
                 try {
                     BookDAO dao = new BookDAO();
                     boolean done = false;
@@ -133,12 +161,14 @@ public class BookPanel extends JPanel {
                     }
                     if (!done) throw new IllegalStateException("No id or isbn to update.");
 
-                    // cập nhật object trong RAM
+                    // ==== Cập nhật object trong RAM ====
                     book.setTitle(newTitle);
                     book.setAuthors(newAuthors);
-                    book.setQuantity(newQty);
                     book.setCategory(newCategory);
+                    book.setQuantity(newQty);
 
+                    // ==== Cập nhật UI tức thời ====
+                    infoArea.setText(recomputeInfo(book));  // cập nhật text hiển thị
                     JOptionPane.showMessageDialog(this, "Document updated.");
                     refreshIfNeeded();
                 } catch (Exception ex) {
@@ -202,13 +232,14 @@ public class BookPanel extends JPanel {
         }
     }
 
-    public void setBorrowVisible(boolean visible) {
-        if (borrowButton != null) borrowButton.setVisible(visible);
-    }
-    public void setUpdateVisible(boolean visible) {
-        if (updateButton != null) updateButton.setVisible(visible);
-    }
-    public void setRemoveVisible(boolean visible) {
-        if (removeButton != null) removeButton.setVisible(visible);
+    private String recomputeInfo(Book b) {
+        String title   = b.getTitle()   != null ? b.getTitle()   : "(No title)";
+        String authors = b.getAuthors() != null ? b.getAuthors() : "(Unknown)";
+        String cat     = b.getCategory()!= null ? b.getCategory(): "";
+        String isbnTxt = (b.getIsbn() == null || b.getIsbn().isBlank() || "N/A".equalsIgnoreCase(b.getIsbn()))
+                ? "N/A" : b.getIsbn();
+        return title + " by " + authors +
+                (cat.isBlank() ? "" : " (" + cat + ")") +
+                " - ISBN: " + isbnTxt + " | Quantity: " + b.getQuantity();
     }
 }

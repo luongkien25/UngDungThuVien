@@ -8,7 +8,8 @@ import java.awt.FlowLayout;
 import java.awt.Point;
 import java.awt.image.BufferedImage;
 import java.sql.SQLException;
-import java.util.ArrayList;
+import java.text.Collator;
+import java.util.*;
 import java.util.List;
 import java.util.Optional;
 
@@ -62,7 +63,7 @@ public class UserGUI extends JFrame {
         setVisible(true);
     }
 
-    /* ============ VIEW 1: DisplayDocument (có Search) ============ */
+    /* ============ VIEW 1: DisplayDocument (có Search + Sort) ============ */
     private void showDisplayView() {
         centerRoot.removeAll();
 
@@ -81,7 +82,7 @@ public class UserGUI extends JFrame {
         final JTextField searchField = new JTextField();
         final JButton searchBtn = new JButton("Search");
 
-        // ===== Thay nút Clear bằng combo 'thể loại nhanh' (điền chuỗi vào ô search) =====
+        // Quick category
         final String[] quickTerms = new String[]{
                 "ALL",
                 "NOVEL","HISTORY","SCIENCE","MATHEMATICS","ENGINEERING","COMPUTER","PROGRAMMING","JAVA","DATABASE","ART",
@@ -92,43 +93,81 @@ public class UserGUI extends JFrame {
                 "SELF HELP","PRODUCTIVITY","STARTUPS","MARKETING","FINANCE","INVESTMENT","NETWORKING"
         };
         final JComboBox<String> categoryBox = new JComboBox<>(quickTerms);
-        // categoryBox.setEditable(true); // nếu muốn cho gõ thêm trong combo
+
+        // Sort options (6 tuỳ chọn)
+        final String[] sortOptions = new String[]{
+                "None",
+                "Tên (A→Z)",
+                "Tên (Z→A)",
+                "Borrowed (nhiều→ít)",
+                "Borrowed (ít→nhiều)",
+                "Quantity (nhiều→ít)",
+                "Quantity (ít→nhiều)"
+        };
+        final JComboBox<String> sortBox = new JComboBox<>(sortOptions);
 
         JPanel rightTop = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         rightTop.setOpaque(false);
         rightTop.add(categoryBox);
+        rightTop.add(sortBox);
         rightTop.add(searchBtn);
 
         topBar.add(new JLabel("Search:"), BorderLayout.WEST);
         topBar.add(searchField, BorderLayout.CENTER);
         topBar.add(rightTop, BorderLayout.EAST);
 
-        // render lần đầu
+        // render/search handler
         final Runnable[] doSearchRef = new Runnable[1];
-        renderBooks(listPanel, allBooks,
-                () -> { if (doSearchRef[0] != null) doSearchRef[0].run(); },
-                true,  // Borrow
-                false, // Update
-                false  // Remove
-        );
-        scrollToTop(scrollPane);
-
-        // search action
         final Runnable doSearch = () -> {
             String q = searchField.getText().trim();
             List<Book> toShow = q.isEmpty()
-                    ? allBooks
+                    ? new ArrayList<>(allBooks)
                     : Optional.ofNullable(library.search(q)).orElse(List.of());
+
+            // LẤY COUNT MAP (đóng băng biến để dùng trong lambda)
+            Map<String, Long> tmpCountMap;
+            try {
+                tmpCountMap = new BookDAO().getBorrowCountsMap(); // Map<String, Long>
+            } catch (SQLException ex) {
+                tmpCountMap = Collections.emptyMap();
+            }
+            final Map<String, Long> countMap = tmpCountMap; // final để dùng trong lambda
+            final Collator vi = Collator.getInstance(new Locale("vi", "VN"));
+            final String sortSel = String.valueOf(sortBox.getSelectedItem());
+
+            // Sort theo lựa chọn
+            toShow.sort((b1, b2) -> {
+                final String t1 = b1.getTitle() == null ? "" : b1.getTitle();
+                final String t2 = b2.getTitle() == null ? "" : b2.getTitle();
+                final long c1 = borrowedOf(countMap, b1);
+                final long c2 = borrowedOf(countMap, b2);
+                switch (sortSel) {
+                    case "Tên (A→Z)": return vi.compare(t1, t2);
+                    case "Tên (Z→A)": return -vi.compare(t1, t2);
+                    case "Borrowed (nhiều→ít)": return Long.compare(c2, c1);
+                    case "Borrowed (ít→nhiều)": return Long.compare(c1, c2);
+                    case "Quantity (nhiều→ít)": return Integer.compare(b2.getQuantity(), b1.getQuantity());
+                    case "Quantity (ít→nhiều)": return Integer.compare(b1.getQuantity(), b2.getQuantity());
+                    case "None": default: return 0;
+                }
+            });
+
             renderBooks(listPanel, toShow,
                     () -> { if (doSearchRef[0] != null) doSearchRef[0].run(); },
-                    true, false, false);
+                    true,  // Borrow
+                    false, // Update
+                    false  // Remove
+            );
             scrollToTop(scrollPane);
         };
         doSearchRef[0] = doSearch;
+
+        // render lần đầu theo Sort mặc định + rỗng query
+        doSearch.run();
+
+        // actions
         searchBtn.addActionListener(ev -> doSearch.run());
         searchField.addActionListener(ev -> doSearch.run());
-
-        // Khi đổi mục trong combo: điền vào ô search rồi tìm luôn
         categoryBox.addActionListener(ev -> {
             String sel = String.valueOf(categoryBox.getSelectedItem());
             if ("All".equalsIgnoreCase(sel)) searchField.setText("");
@@ -136,8 +175,9 @@ public class UserGUI extends JFrame {
             doSearch.run();
             searchField.requestFocusInWindow();
         });
+        sortBox.addActionListener(ev -> doSearch.run());
 
-        // (tuỳ chọn) ESC để xoá nhanh ô search (không ảnh hưởng combo)
+        // (tuỳ chọn) ESC để xoá nhanh ô search
         javax.swing.KeyStroke esc = javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0);
         searchField.getInputMap(JComponent.WHEN_FOCUSED).put(esc, "clearSearch");
         searchField.getActionMap().put("clearSearch", new AbstractAction() {
@@ -235,7 +275,7 @@ public class UserGUI extends JFrame {
         JOptionPane.showMessageDialog(this, "Logged out: " + u.getName());
 
         // Mở lại màn hình login trên EDT
-        SwingUtilities.invokeLater(() -> new LibraryAppUI());
+        SwingUtilities.invokeLater(LibraryAppUI::new);
 
         // Đóng cửa sổ hiện tại
         dispose();
@@ -319,5 +359,10 @@ public class UserGUI extends JFrame {
                 ? Session.getCurrentUser().getUserId()
                 : this.userId;
     }
-}
 
+    // ===== Helpers cho Sort Borrowed =====
+    private static long borrowedOf(Map<String, Long> countMap, Book b) {
+        if (b == null || b.getId() == null) return 0L;
+        return countMap.getOrDefault(b.getId(), 0L);
+    }
+}
