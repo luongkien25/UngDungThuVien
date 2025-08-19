@@ -169,52 +169,84 @@ public class BookDAO {
 
     public java.util.List<Book> suggestForUser(String userId, int limit) throws SQLException {
         String sql = """
-        WITH my_cat AS (
-                 SELECT b.category, COUNT(*) c
-                 FROM borrow_records br
-                 JOIN books b ON b.id = br.book_id
-                 WHERE br.user_id = ?
-                 GROUP BY b.category
-                 ORDER BY c DESC
-                 LIMIT 3
-               ),
-               fav_books AS (
-                 SELECT b.*
-                 FROM books b
-                 WHERE b.category IN (SELECT category FROM my_cat)
-               ),
-               global_pop AS (
-                 -- sách phổ biến toàn hệ thống (fallback)
-                 SELECT b.*, COUNT(br.id) AS pop
-                 FROM books b
-                 LEFT JOIN borrow_records br ON br.book_id = b.id
-                 GROUP BY b.id
-               )
-               SELECT
-                 x.id, x.isbn, x.title, x.authors, x.category, x.quantity, x.thumbnail_link
-               FROM (
-                  -- nếu có my_cat → lấy từ fav_books; nếu không, lấy từ global_pop
-                  SELECT fb.id, fb.isbn, fb.title, fb.authors, fb.category, fb.quantity, fb.thumbnail_link, 1 AS src
-                  FROM fav_books fb
-                  UNION ALL
-                  SELECT gp.id, gp.isbn, gp.title, gp.authors, gp.category, gp.quantity, gp.thumbnail_link, 2 AS src
-                  FROM global_pop gp
-               ) AS x
-               LEFT JOIN borrow_records br_me
-                      ON br_me.user_id = ? AND br_me.book_id = x.id AND br_me.return_date IS NULL  -- chỉ loại sách ĐANG mượn
-               WHERE
-                 (x.src = 1 OR NOT EXISTS (SELECT 1 FROM my_cat)) -- có lịch sử thì ưu tiên fav_books; nếu không có, dùng global_pop
-                 AND x.quantity > 0
-               ORDER BY
-                 x.src,                                -- ưu tiên nguồn 1 (fav) trước nguồn 2 (global)
-                 x.title
-               LIMIT ?;
+        WITH
+        -- Mốc THÁNG hiện tại
+        this_month AS (
+          SELECT
+            DATE_FORMAT(CURDATE(), '%Y-%m-01') AS d_start,
+            DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01') AS d_next
+        ),
+        -- Top 3 category user mượn trong THÁNG này
+        my_cat AS (
+          SELECT b.category, COUNT(*) c
+          FROM borrow_records br
+          JOIN books b ON b.id = br.book_id
+          JOIN this_month tm
+          WHERE br.user_id = ?
+            AND br.borrow_date >= tm.d_start
+            AND br.borrow_date <  tm.d_next
+          GROUP BY b.category
+          ORDER BY c DESC
+          LIMIT 3
+        ),
+        -- Pool 1: sách theo sở thích trong THÁNG
+        fav_books AS (
+          SELECT b.*
+          FROM books b
+          WHERE b.category IN (SELECT category FROM my_cat)
+        ),
+        -- Pool 2: sách phổ biến toàn hệ thống trong THÁNG (hot)
+        global_pop AS (
+          SELECT b.*, COUNT(br.id) AS pop
+          FROM books b
+          LEFT JOIN borrow_records br ON br.book_id = b.id
+          JOIN this_month tm
+          WHERE (br.borrow_date IS NULL
+                 OR (br.borrow_date >= tm.d_start AND br.borrow_date < tm.d_next))
+          GROUP BY b.id
+        ),
+        -- Gộp 2 nguồn; src=1=fav, src=2=global
+        unioned AS (
+          SELECT fb.id, fb.isbn, fb.title, fb.authors, fb.category, fb.quantity, fb.thumbnail_link,
+                 1 AS src, NULL AS pop
+          FROM fav_books fb
+          UNION ALL
+          SELECT gp.id, gp.isbn, gp.title, gp.authors, gp.category, gp.quantity, gp.thumbnail_link,
+                 2 AS src, gp.pop
+          FROM global_pop gp
+        ),
+        -- Khử trùng theo id, ưu tiên src=1
+        ranked AS (
+          SELECT u.*,
+                 ROW_NUMBER() OVER (PARTITION BY u.id ORDER BY u.src) AS rn
+          FROM unioned u
+        )
+        SELECT r.id, r.isbn, r.title, r.authors, r.category, r.quantity, r.thumbnail_link
+        FROM ranked r
+        WHERE
+          r.rn = 1                 -- khử trùng: giữ fav nếu trùng với global
+          AND r.quantity > 0
+          -- loại mọi sách user đã từng mượn (all-time); nếu muốn chỉ loại trong THÁNG, báo mình để đổi điều kiện thời gian
+          AND NOT EXISTS (
+                SELECT 1
+                FROM borrow_records br_all
+                WHERE br_all.user_id = ?
+                  AND br_all.book_id = r.id
+          )
+        ORDER BY
+          r.src,                                       -- fav trước global
+          CASE WHEN r.src = 1 THEN r.title END ASC,    -- trong fav: sắp theo title (tùy bạn đổi tiêu chí)
+          CASE WHEN r.src = 2 THEN r.pop   END DESC,   -- trong global: sắp theo độ hot trong THÁNG
+          r.title ASC
+        LIMIT ?;
     """;
+
         try (Connection c = DatabaseManager.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, userId);
-            ps.setString(2, userId);
+            ps.setString(1, userId); // my_cat (tháng)
+            ps.setString(2, userId); // loại sách đã từng mượn (all-time)
             ps.setInt(3, limit);
+
             try (ResultSet rs = ps.executeQuery()) {
                 java.util.List<Book> out = new java.util.ArrayList<>();
                 while (rs.next()) {
@@ -233,6 +265,7 @@ public class BookDAO {
             }
         }
     }
+
 
     public void updateBookById(int id,
                                String newTitle,
