@@ -48,7 +48,7 @@
 
 # \### 🔄 Mượn – trả sách
 
-# \- Ghi nhận lịch sử mượn – trả
+# \- Ghi nhận và hiển thị lịch sử mượn – trả của hệ thống, người dung mượn quá hạn sẽ được đẩy lên đầu danh sách
 
 # \- Hiển thị danh sách sách đã mượn
 
@@ -60,7 +60,9 @@
 
 # \### 💡 Tính năng nâng cao
 
-# \- Gợi ý sách dựa trên \*\*thể loại yêu thích\*\* của người dùng
+# \- Tính năng tìm kiếm sách nâng cao cho phép có sai xót trong nhập xâu kí tự tìm kiếm, danh sách hiển thị theo độ liên quan giảm dần, cho phép lọc xếp danh sách hiển thị theo thể loại, sắp xếp danh sách hiển thị theo các chỉ định.
+
+# \- Gợi ý sách dựa trên cho người dung dựa trên thể loại sách yêu thích của họ(ưu tiên hơn) và sách phổ biến trong hệ trong khoảng thời gian.
 
 # \- Hiển thị sách vừa đọc gần nhất
 
@@ -68,9 +70,9 @@
 
 # \- Giao diện riêng:
 
-# &nbsp; - \*\*AdminGUI\*\*: Quản lý sách, người dùng, thống kê
+#   - \*\*AdminGUI\*\*: Quản lý sách, người dùng, thống kê
 
-# &nbsp; - \*\*UserGUI\*\*: Mượn – trả, gợi ý sách, đổi mật khẩu, xem lịch sử
+#   - \*\*UserGUI\*\*: Mượn – trả, gợi ý sách, đổi mật khẩu, xem lịch sử
 
 # 
 
@@ -80,11 +82,11 @@
 
 # \## 🛠 Yêu cầu hệ thống
 
-# \- \*\*Java JDK\*\* 17 trở lên  
+# \- \*\*Java JDK\*\* 17 trở lên
 
-# \- \*\*MySQL\*\* 8.x  
+# \- \*\*MySQL\*\* 8.x
 
-# \- \*\*Maven\*\* 3.9.x  
+# \- \*\*Maven\*\* 3.9.x
 
 # 
 
@@ -112,13 +114,25 @@
 
 # 
 
-# pass: luongkien25
+# pass: 1234
 
 # 
 
-# User
+# User 
+
+Có thể tự đăng ký mới
+## 🗂 Cấu trúc thư viện
+===
 
 # 
 
-# Có thể đăng ký mới ngay trên giao diện.
+!\[Cấu trúc thư viện](CauTrucThuVien.png)
+## 🎬Video Demo
+===
+
+https://drive.google.com/drive/folders/1sjD\_W2HCHnKucx7E3ioPmj5BIkiVxZOh?usp=drive\_link
+
+===
+
+
 
