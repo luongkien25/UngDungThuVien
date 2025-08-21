@@ -40,7 +40,7 @@
 
 # \- Đổi mật khẩu cho cả Admin và User
 
-# \- Thống kê số lượt mượn sách của từng user
+# \- Thống kê,sắp xếp số lượt mượn sách của từng user
 
 # \- Giới hạn số lượt mượn cùng lúc (tối đa \*\*3 cuốn\*\*)
 
