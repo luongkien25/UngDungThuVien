@@ -48,7 +48,7 @@
 
 # \### 🔄 Mượn – trả sách
 
-# \- Ghi nhận và hiển thị lịch sử mượn – trả của hệ thống, người dung mượn quá hạn sẽ được đẩy lên đầu danh sách
+# \- Ghi nhận và hiển thị lịch sử mượn – trả của hệ thống, người dùng mượn quá hạn sẽ được đẩy lên đầu danh sách
 
 # \- Hiển thị danh sách sách đã mượn
 
@@ -60,19 +60,19 @@
 
 # \### 💡 Tính năng nâng cao
 
-# \- Tính năng tìm kiếm sách nâng cao cho phép có sai xót trong nhập xâu kí tự tìm kiếm, danh sách hiển thị theo độ liên quan giảm dần, cho phép lọc xếp danh sách hiển thị theo thể loại, sắp xếp danh sách hiển thị theo các chỉ định.
+# \- Tìm kiếm nâng cao: chấp nhận sai sót khi nhập, sắp xếp theo độ liên quan, lọc theo thể loại, tùy chọn sắp xếp.
 
-# \- Gợi ý sách dựa trên cho người dung dựa trên thể loại sách yêu thích của họ(ưu tiên hơn) và sách phổ biến trong hệ trong khoảng thời gian.
+# \- Gợi ý sách dựa trên thể loại yêu thích (ưu tiên) và sách phổ biến trong hệ thống theo thời gian.
 
-# \- Hiển thị sách vừa đọc gần nhất
+# \- Hiển thị sách vừa đọc.
 
-# \- Cache ảnh để tăng tốc hiển thị danh sách
+# \- Cache ảnh để tăng tốc hiển thị.
 
 # \- Giao diện riêng:
 
-#   - \*\*AdminGUI\*\*: Quản lý sách, người dùng, thống kê
+# &nbsp; - \*\*AdminGUI\*\*: Quản lý sách, người dùng, thống kê
 
-#   - \*\*UserGUI\*\*: Mượn – trả, gợi ý sách, đổi mật khẩu, xem lịch sử
+# &nbsp; - \*\*UserGUI\*\*: Mượn – trả, gợi ý sách, đổi mật khẩu, xem lịch sử
 
 # 
 
@@ -82,7 +82,7 @@
 
 # \## 🛠 Yêu cầu hệ thống
 
-# \- \*\*Java JDK\*\* 17 trở lên
+# \- \*\*Java JDK\*\* 17+
 
 # \- \*\*MySQL\*\* 8.x
 
@@ -96,43 +96,41 @@
 
 # \## ⚙️ Cài đặt \& chạy chương trình
 
-# 1\. Clone project: https://github.com/luongkien25/UngDungThuVien.git
+# 1\. Clone project: https://github.com/luongkien25/UngDungThuVien.git  
 
-# Cấu hình cơ sở dữ liệu trong DatabaseManager.java
+# 2\. Cấu hình cơ sở dữ liệu trong `DatabaseManager.java`  
 
-# Import cơ sở dữ liệu từ file Dump20250818.sql
-
-# 
-
-# 🔑 Tài khoản mặc định
-
-# Admin
+# 3\. Import cơ sở dữ liệu từ file `Dump20250818.sql`
 
 # 
 
-# user: admin
+# \*\*🔑 Tài khoản mặc định\*\*
+
+# \- \*\*Admin\*\*: user `admin`, pass `1234`  
+
+# \- \*\*User\*\*: có thể tự đăng ký mới
 
 # 
 
-# pass: 1234
+# ---
 
 # 
 
-# User 
+# \## 🗂 Cấu trúc thư viện
 
-Có thể tự đăng ký mới
-## 🗂 Cấu trúc thư viện
+# !\[Cấu trúc thư viện](./CauTrucThuVien.png)
+
+# 
+
+# ---
+
+# 
+
+# \## 🎬 Video demo
+
+# 
+
+# \- Google Drive: \[Xem video demo](https://drive.google.com/drive/folders/1sjD\_W2HCHnKucx7E3ioPmj5BIkiVxZOh?usp=drive\_link)
+
 ===
-
-# 
-
-!\[Cấu trúc thư viện](CauTrucThuVien.png)
-## 🎬Video Demo
-===
-
-https://drive.google.com/drive/folders/1sjD\_W2HCHnKucx7E3ioPmj5BIkiVxZOh?usp=drive\_link
-
-===
-
-
 
