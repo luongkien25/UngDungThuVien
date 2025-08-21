@@ -118,7 +118,7 @@
 
 # \## 🗂 Cấu trúc thư viện
 
-# !\[Cấu trúc thư viện](./CauTrucThuVien.png)
+# ![Cấu trúc thư viện](https://raw.githubusercontent.com/luongkien25/UngDungThuVien/main/CauTrucThuVien.png)
 
 # 
 
