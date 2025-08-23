@@ -106,7 +106,7 @@
 
 # \*\*🔑 Tài khoản mặc định\*\*
 
-# \- \*\*Admin\*\*: user `admin`, pass `1234`  
+# \- \*\*Admin\*\*: user `admin`, pass `luongkien25`  
 
 # \- \*\*User\*\*: có thể tự đăng ký mới
 
